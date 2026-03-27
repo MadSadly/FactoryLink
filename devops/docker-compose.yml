@@ -1,0 +1,47 @@
+version: "3.9"
+# 개인 프로젝트: 비밀값은 devops/.env 에 두고, 예시는 devops/.env.example 을 복사하세요.
+# 실행 시 --env-file 로 지정하면 Compose 가 ${변수} 치환에 사용합니다.
+#   docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
+
+services:
+  client:
+    build: ../client
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server-spring
+      - server-node
+
+  server-spring:
+    build: ../server-spring
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mariadb://mariadb:3306/factory_link}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-root}
+    depends_on:
+      - mariadb
+
+  server-node:
+    build: ../server-node
+    ports:
+      - "3001:3001"
+
+  server-ai:
+    build: ../server-ai
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  mariadb:
+    image: mariadb:11.6
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-factory_link}
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+      - ../server-spring/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql

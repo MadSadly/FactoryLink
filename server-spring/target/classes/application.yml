@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: server-spring
+  datasource:
+    url: jdbc:mariadb://localhost:3306/factory_link
+    username: root
+    password: root
+    driver-class-name: org.mariadb.jdbc.Driver
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.factorylink
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    # 운영에서는 APP_JWT_SECRET 환경 변수를 반드시 설정한다.
+    secret: ${APP_JWT_SECRET:factorylink-dev-secret-change-before-prod-1234567890}
+    expiration-ms: 86400000
