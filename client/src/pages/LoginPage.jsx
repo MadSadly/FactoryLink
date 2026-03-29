@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { btnPrimaryClass, cardClass, inputClass } from "../lib/ui";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -17,37 +18,52 @@ export default function LoginPage() {
     try {
       const response = await apiClient.post("/auth/login", { email, password });
       setAuthToken(response.data.token);
-      navigate("/");
+      navigate("/dashboard");
     } catch {
-      setErrorMessage("로그인에 실패했습니다. 계정 정보를 확인하세요.");
+      setErrorMessage("로그인에 실패했습니다. 이메일과 비밀번호를 확인하세요.");
     }
   };
 
   return (
-    <div className="mx-auto max-w-md rounded-lg bg-white p-6 shadow">
-      <h2 className="mb-4 text-2xl font-semibold">로그인</h2>
-      <form className="space-y-3" onSubmit={handleLogin}>
-        <input
-          className="w-full rounded border p-2"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="email"
-          required
-          type="email"
-        />
-        <input
-          className="w-full rounded border p-2"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="password"
-          required
-          type="password"
-        />
-        {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
-        <button className="w-full rounded bg-blue-600 p-2 text-white" type="submit">
+    <div className={`${cardClass} w-full max-w-md shadow-xl`}>
+      <h2 className="mb-1 text-2xl font-extrabold text-on-surface">로그인</h2>
+      <p className="mb-6 text-sm text-on-surface-variant">Factory-Link 제조 포털에 로그인합니다.</p>
+      <form className="space-y-4" onSubmit={handleLogin}>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">이메일</label>
+          <input
+            className={inputClass}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+            required
+            type="email"
+            autoComplete="email"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">비밀번호</label>
+          <input
+            className={inputClass}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="••••••••"
+            required
+            type="password"
+            autoComplete="current-password"
+          />
+        </div>
+        {errorMessage && <p className="rounded-lg bg-error-container/40 p-3 text-sm text-error">{errorMessage}</p>}
+        <button className={`${btnPrimaryClass} w-full`} type="submit">
           로그인
         </button>
       </form>
+      <p className="mt-6 text-center text-sm text-on-surface-variant">
+        계정이 없으신가요?{" "}
+        <Link className="font-bold text-primary hover:underline" to="/signup">
+          회원가입
+        </Link>
+      </p>
     </div>
   );
 }

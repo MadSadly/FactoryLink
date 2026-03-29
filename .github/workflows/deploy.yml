@@ -54,6 +54,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Docker Build (all services)
+        env:
+          DB_ROOT_PASSWORD: rootpassword
+          DB_USER: factorylink
+          DB_PASS: factorylink123
+          JWT_SECRET: ci_jwt_secret_value_must_be_at_least_32_chars_xx
+          OPENAI_API_KEY: ""
         run: docker compose -f devops/docker-compose.yml build
 
       - name: Deploy Placeholder

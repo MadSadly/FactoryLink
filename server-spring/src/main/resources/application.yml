@@ -2,20 +2,24 @@ spring:
   application:
     name: server-spring
   datasource:
-    url: jdbc:mariadb://localhost:3306/factory_link
-    username: root
-    password: root
+    url: ${SPRING_DATASOURCE_URL:jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:factory_link}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASS:root}}
     driver-class-name: org.mariadb.jdbc.Driver
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.factorylink
+  type-aliases-package: com.factorylink.entity,com.factorylink.dto
+  configuration:
+    map-underscore-to-camel-case: true
 
 server:
   port: 8080
 
 app:
   jwt:
-    # 운영에서는 APP_JWT_SECRET 환경 변수를 반드시 설정한다.
-    secret: ${APP_JWT_SECRET:factorylink-dev-secret-change-before-prod-1234567890}
+    secret: ${JWT_SECRET:${APP_JWT_SECRET:factorylink-dev-secret-change-before-prod-12345678901234}}
     expiration-ms: 86400000
+  ai:
+    server:
+      url: ${AI_SERVER_URL:http://localhost:8000}

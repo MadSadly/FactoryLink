@@ -9,7 +9,6 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -26,16 +25,19 @@ public class JwtTokenProvider {
     this.expirationMs = expirationMs;
   }
 
-  public String createToken(Long userId, String email, String role) {
+  public String createToken(Long userId, String email, String role, Long companyId) {
     Instant now = Instant.now();
-    return Jwts.builder()
-        .subject(email)
-        .claim("userId", userId)
-        .claim("role", role)
-        .issuedAt(Date.from(now))
-        .expiration(Date.from(now.plusMillis(expirationMs)))
-        .signWith(signingKey)
-        .compact();
+    var builder =
+        Jwts.builder()
+            .subject(email)
+            .claim("userId", userId)
+            .claim("role", role)
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusMillis(expirationMs)));
+    if (companyId != null) {
+      builder = builder.claim("companyId", companyId);
+    }
+    return builder.signWith(signingKey).compact();
   }
 
   public boolean isValid(String token) {
@@ -50,12 +52,18 @@ public class JwtTokenProvider {
   public void setAuthentication(String token) {
     Claims claims = Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload();
     String role = String.valueOf(claims.get("role"));
+    Long userId = ((Number) claims.get("userId")).longValue();
+    Long companyId = null;
+    Object companyClaim = claims.get("companyId");
+    if (companyClaim instanceof Number n) {
+      companyId = n.longValue();
+    }
 
+    JwtUserPrincipal principal =
+        new JwtUserPrincipal(userId, companyId, claims.getSubject(), role);
     UsernamePasswordAuthenticationToken auth =
         new UsernamePasswordAuthenticationToken(
-            claims.getSubject(),
-            null,
-            java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+            principal, null, principal.getAuthorities());
 
     SecurityContextHolder.getContext().setAuthentication(auth);
   }

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.factorylink.mapper.PartMapper">
+
+  <select id="selectList" resultType="com.factorylink.entity.Part">
+    SELECT id, company_id, name, category, unit_price, stock_quantity, unit, description, region,
+           created_at, updated_at
+    FROM parts
+    <where>
+      <if test="region != null and region != ''">
+        AND region = #{region}
+      </if>
+      <if test="category != null and category != ''">
+        AND category = #{category}
+      </if>
+    </where>
+    <choose>
+      <when test="sort == 'price_asc'">ORDER BY unit_price ASC, id DESC</when>
+      <when test="sort == 'price_desc'">ORDER BY unit_price DESC, id DESC</when>
+      <when test="sort == 'stock_desc'">ORDER BY stock_quantity DESC, id DESC</when>
+      <otherwise>ORDER BY id DESC</otherwise>
+    </choose>
+  </select>
+
+  <select id="selectById" resultType="com.factorylink.entity.Part">
+    SELECT id, company_id, name, category, unit_price, stock_quantity, unit, description, region,
+           created_at, updated_at
+    FROM parts WHERE id = #{id}
+  </select>
+
+  <select id="selectDetailById" resultType="com.factorylink.dto.PartDetailDto">
+    SELECT p.id, p.company_id AS companyId, c.name AS companyName, p.name, p.category,
+           p.unit_price AS unitPrice, p.stock_quantity AS stockQuantity, p.unit, p.description,
+           p.region, p.created_at AS createdAt, p.updated_at AS updatedAt
+    FROM parts p
+    JOIN companies c ON c.id = p.company_id
+    WHERE p.id = #{id}
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO parts (company_id, name, category, unit_price, stock_quantity, unit, description, region)
+    VALUES (#{companyId}, #{name}, #{category}, #{unitPrice}, #{stockQuantity}, #{unit}, #{description}, #{region})
+  </insert>
+
+  <update id="update">
+    UPDATE parts
+    <set>
+      <if test="name != null">name = #{name},</if>
+      <if test="category != null">category = #{category},</if>
+      <if test="unitPrice != null">unit_price = #{unitPrice},</if>
+      <if test="stockQuantity != null">stock_quantity = #{stockQuantity},</if>
+      <if test="unit != null">unit = #{unit},</if>
+      <if test="description != null">description = #{description},</if>
+    </set>
+    WHERE id = #{id}
+  </update>
+
+  <delete id="delete">DELETE FROM parts WHERE id = #{id}</delete>
+
+  <select id="selectByCompanyId" resultType="com.factorylink.entity.Part">
+    SELECT id, company_id, name, category, unit_price, stock_quantity, unit, description, region,
+           created_at, updated_at
+    FROM parts WHERE company_id = #{companyId} ORDER BY id ASC
+  </select>
+</mapper>

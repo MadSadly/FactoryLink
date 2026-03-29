@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { chatSocket } from "../api/socket";
+import { btnPrimaryClass, cardClass, inputClass } from "../lib/ui";
 
 export default function ChatPage() {
   const [roomId, setRoomId] = useState("factory-room-1");
@@ -10,7 +11,6 @@ export default function ChatPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    // 실시간 이벤트 구독을 초기화한다.
     chatSocket.connect();
     chatSocket.emit("join-room", { roomId, senderId });
 
@@ -60,49 +60,55 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
-      <h2 className="mb-4 text-xl font-semibold">1:1 실시간 채팅</h2>
-      <p className="mb-2 text-sm">
-        연결 상태:{" "}
-        <span className="font-semibold">
-          {connectionStatus === "connected" ? "연결됨" : connectionStatus}
-        </span>
-      </p>
-      {errorMessage && <p className="mb-3 text-sm text-red-600">{errorMessage}</p>}
-      <div className="mb-4 grid gap-2 md:grid-cols-2">
-        <input
-          className="rounded border p-2"
-          value={roomId}
-          onChange={(event) => setRoomId(event.target.value)}
-          placeholder="roomId"
-        />
-        <input
-          className="rounded border p-2"
-          value={senderId}
-          onChange={(event) => setSenderId(event.target.value)}
-          placeholder="senderId"
-        />
+    <div className="space-y-8">
+      <div>
+        <h2 className="mb-2 text-3xl font-extrabold tracking-tight text-on-surface">1:1 실시간 채팅</h2>
+        <p className="text-on-surface-variant">거래 상대와 실시간으로 메시지를 주고받습니다.</p>
       </div>
 
-      <div className="mb-4 h-60 overflow-y-auto rounded border bg-slate-50 p-3">
-        {messages.map((item, index) => (
-          <div key={`${item.timestamp}-${index}`} className="mb-2 text-sm">
-            <span className="font-medium">{item.senderId}:</span> {item.message}
+      <div className={cardClass}>
+        <p className="mb-4 text-sm">
+          연결 상태:{" "}
+          <span className="font-semibold text-primary">
+            {connectionStatus === "connected" ? "연결됨" : connectionStatus}
+          </span>
+        </p>
+        {errorMessage && <p className="mb-4 rounded-lg bg-error-container/30 p-3 text-sm text-error">{errorMessage}</p>}
+
+        <div className="mb-4 grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">채팅방 ID</label>
+            <input className={inputClass} value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="roomId" />
           </div>
-        ))}
-      </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">발신자 ID</label>
+            <input className={inputClass} value={senderId} onChange={(e) => setSenderId(e.target.value)} placeholder="senderId" />
+          </div>
+        </div>
 
-      <div className="flex gap-2">
-        <input
-          className="flex-1 rounded border p-2"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && handleSend()}
-          placeholder="메시지를 입력하세요"
-        />
-        <button className="rounded bg-blue-600 px-4 py-2 text-white" onClick={handleSend}>
-          전송
-        </button>
+        <div className="mb-4 max-h-72 overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container/40 p-4">
+          {messages.length === 0 && <p className="text-center text-sm text-on-surface-variant">메시지가 없습니다.</p>}
+          {messages.map((item, index) => (
+            <div key={`${item.timestamp}-${index}`} className="mb-3 text-sm">
+              <span className="font-semibold text-primary">{item.senderId}</span>
+              <span className="text-on-surface-variant"> · </span>
+              {item.message}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            className={`${inputClass} sm:flex-1`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="메시지를 입력하세요"
+          />
+          <button type="button" className={`${btnPrimaryClass} shrink-0`} onClick={handleSend}>
+            전송
+          </button>
+        </div>
       </div>
     </div>
   );

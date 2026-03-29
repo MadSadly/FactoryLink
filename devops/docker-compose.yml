@@ -1,47 +1,85 @@
 version: "3.9"
-# 개인 프로젝트: 비밀값은 devops/.env 에 두고, 예시는 devops/.env.example 을 복사하세요.
-# 실행 시 --env-file 로 지정하면 Compose 가 ${변수} 치환에 사용합니다.
-#   docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
+# Run: docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
 
 services:
-  client:
-    build: ../client
+  mariadb:
+    image: mariadb:10.6
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: factory_link
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - ../db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ../db/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      - mariadb_data:/var/lib/mysql
     ports:
-      - "5173:5173"
-    depends_on:
-      - server-spring
-      - server-node
+      - "3306:3306"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   server-spring:
-    build: ../server-spring
+    build:
+      context: ../server-spring
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mariadb://mariadb:3306/factory_link}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-root}
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: factory_link
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      JWT_SECRET: ${JWT_SECRET}
+      AI_SERVER_URL: http://server-ai:8000
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
 
   server-node:
-    build: ../server-node
+    build:
+      context: ../server-node
+      dockerfile: Dockerfile
     ports:
       - "3001:3001"
+    environment:
+      PORT: 3001
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: factory_link
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+    depends_on:
+      mariadb:
+        condition: service_healthy
 
   server-ai:
-    build: ../server-ai
+    build:
+      context: ../server-ai
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
-  mariadb:
-    image: mariadb:11.6
+  client:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
     ports:
-      - "3306:3306"
-    environment:
-      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MARIADB_DATABASE: ${MARIADB_DATABASE:-factory_link}
-    volumes:
-      - ./mariadb-data:/var/lib/mysql
-      - ../server-spring/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - "5173:80"
+    depends_on:
+      - server-spring
+      - server-node
+      - server-ai
+
+volumes:
+  mariadb_data:

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.factorylink.mapper.ContractMapper">
+
+  <select id="selectByCompany" resultType="com.factorylink.entity.Contract">
+    SELECT id, room_id AS roomId, buyer_company_id AS buyerCompanyId, seller_company_id AS sellerCompanyId,
+           part_id AS partId, quantity, unit_price AS unitPrice, total_price AS totalPrice,
+           contract_text AS contractText, status, created_at AS createdAt
+    FROM contracts
+    WHERE buyer_company_id = #{companyId} OR seller_company_id = #{companyId}
+    ORDER BY id DESC
+  </select>
+
+  <select id="selectById" resultType="com.factorylink.entity.Contract">
+    SELECT id, room_id AS roomId, buyer_company_id AS buyerCompanyId, seller_company_id AS sellerCompanyId,
+           part_id AS partId, quantity, unit_price AS unitPrice, total_price AS totalPrice,
+           contract_text AS contractText, status, created_at AS createdAt
+    FROM contracts WHERE id = #{id}
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO contracts (room_id, buyer_company_id, seller_company_id, part_id, quantity, unit_price,
+                          total_price, contract_text, status)
+    VALUES (#{roomId}, #{buyerCompanyId}, #{sellerCompanyId}, #{partId}, #{quantity}, #{unitPrice},
+            #{totalPrice}, #{contractText}, #{status})
+  </insert>
+
+  <update id="updateContractText">
+    UPDATE contracts SET contract_text = #{contractText} WHERE id = #{id}
+  </update>
+
+  <update id="updateStatus">
+    UPDATE contracts SET status = #{status} WHERE id = #{id}
+  </update>
+</mapper>

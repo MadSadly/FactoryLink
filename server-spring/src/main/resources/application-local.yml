@@ -1,16 +1,5 @@
-# 로컬 개발: MariaDB 없이 기동 (인메모리 H2, MariaDB 호환 모드)
-# 실행 예: SPRING_PROFILES_ACTIVE=local
-# Windows PowerShell: $env:SPRING_PROFILES_ACTIVE="local"; mvn spring-boot:run
-spring:
-  datasource:
-    url: jdbc:h2:mem:factorylink;MODE=MariaDB;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema.sql
-  h2:
-    console:
-      enabled: false
+# Optional profile: enable with SPRING_PROFILES_ACTIVE=local
+# Uses the same datasource as default; add debug logging for mappers.
+logging:
+  level:
+    com.factorylink.mapper: DEBUG

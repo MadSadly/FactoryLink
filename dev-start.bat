@@ -8,6 +8,7 @@ cd /d "%ROOT%"
 
 echo ============================================
 echo  Factory-Link - 의존성 설치 + 서버 기동
+echo  (Spring은 MariaDB factory_link DB가 필요합니다. Docker: devops\docker-compose.yml 의 mariadb 만 띄우거나 전체 스택 사용)
 echo ============================================
 echo.
 
@@ -54,7 +55,7 @@ echo [2/2] 서버를 새 창에서 실행합니다. (각 창을 닫으면 해당
 echo.
 
 REM Spring (8080) - 다른 창 (^&^& 로 한 줄 명령 연결)
-start "Factory-Link Spring" cmd /k cd /d "%ROOT%server-spring" ^&^& set SPRING_PROFILES_ACTIVE=local ^&^& mvnw.cmd spring-boot:run
+start "Factory-Link Spring" cmd /k cd /d "%ROOT%server-spring" ^&^& mvnw.cmd spring-boot:run
 
 REM 기동 대기 (첫 실행 시 Maven 다운로드로 더 걸릴 수 있음)
 timeout /t 12 /nobreak >nul

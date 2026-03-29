@@ -24,9 +24,10 @@ public class AuthController {
 
   @PostMapping("/signup")
   public AuthResponse signup(@RequestBody SignupRequest request) {
-    String role = (request.role() == null || request.role().isBlank()) ? "USER" : request.role();
+    String role = (request.role() == null || request.role().isBlank()) ? "MEMBER" : request.role();
     SignupRequest normalized =
-        new SignupRequest(request.email(), request.password(), request.name(), role);
+        new SignupRequest(
+            request.email(), request.password(), request.name(), role, request.companyId());
     return authService.signup(normalized);
   }
 
