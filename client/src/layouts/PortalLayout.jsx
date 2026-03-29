@@ -41,6 +41,10 @@ export default function PortalLayout() {
             <span className="material-symbols-outlined">inventory_2</span>
             <span className="font-sans text-sm font-medium uppercase tracking-wide">부품</span>
           </NavLink>
+          <NavLink to="/companies" className={navLinkClass}>
+            <span className="material-symbols-outlined">map</span>
+            <span className="font-sans text-sm font-medium uppercase tracking-wide">업체 지도</span>
+          </NavLink>
           <span className="flex cursor-not-allowed items-center gap-3 rounded-xl px-4 py-3 text-slate-400 opacity-60 dark:text-slate-500">
             <span className="material-symbols-outlined">description</span>
             <span className="font-sans text-sm font-medium uppercase tracking-wide">견적 요청</span>

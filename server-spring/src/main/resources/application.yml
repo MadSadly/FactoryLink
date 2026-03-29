@@ -3,8 +3,8 @@ spring:
     name: server-spring
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:factory_link}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:root}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASS:root}}
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: org.mariadb.jdbc.Driver
 
 mybatis:
@@ -18,8 +18,8 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:${APP_JWT_SECRET:factorylink-dev-secret-change-before-prod-12345678901234}}
-    expiration-ms: 86400000
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   ai:
     server:
       url: ${AI_SERVER_URL:http://localhost:8000}

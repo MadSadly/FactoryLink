@@ -1,0 +1,115 @@
+================================================================================
+Factory-Link — 작업 정리 (2026-03-29 기준)
+================================================================================
+
+본 문서는 대화·구현을 통해 진행된 작업을 요약합니다. (클라이언트 UI 대규모 리팩터는
+요청 범위 밖이면 제외하고, 실제 반영된 변경 위주로 기술합니다.)
+
+
+--------------------------------------------------------------------------------
+1. 데이터베이스 (MariaDB)
+--------------------------------------------------------------------------------
+- /db/schema.sql, /db/seed.sql 추가
+  · companies, users, parts, chat_rooms, chat_messages, contracts
+  · 시드: 회사 10곳, 부품 30개, 회사당 사용자 2명, 데모 비밀번호 password123 (bcrypt)
+- server-spring/src/main/resources/schema.sql 동기화
+
+
+--------------------------------------------------------------------------------
+2. Spring Boot (server-spring)
+--------------------------------------------------------------------------------
+- MyBatis: Part / Company / Contract 매퍼(XML) 및 서비스·컨트롤러
+- REST API
+  · GET/POST/PUT/DELETE /api/parts (목록 필터·정렬, JWT로 소유 검증)
+  · GET/PUT /api/companies, GET 상세 시 부품 목록 포함
+  · GET/POST/PATCH /api/contracts (AI 연동으로 계약서 본문 생성)
+- 공통 응답: ApiResponse { success, data, message }, GlobalExceptionHandler
+- JWT: JwtUserPrincipal, 토큰에 companyId 클레임
+- Auth: users 테이블 기준 가입/로그인 (가입 시 companyId 필수)
+- pom: validation, springdoc-openapi
+- application.yml: DB_*, JWT_SECRET, JWT_EXPIRATION_MS, AI_SERVER_URL 등
+- 기동 시 DB_USER / DB_PASS / JWT_SECRET 검증 (test 프로필 제외)
+- JwtTokenProvider: 시크릿 32바이트 이상 검증
+- Health: /api/health → success/data/message 형식
+- CORS: CorsConfig + WebConfig (/api/**, 5173·3000·80 등)
+- WebClient 대신 RestTemplate으로 AI 서버 호출
+
+
+--------------------------------------------------------------------------------
+3. Node 채팅 (server-node)
+--------------------------------------------------------------------------------
+- mysql2 풀, DB 환경 변수 필수 검증 (DB_HOST, DB_USER, DB_PASS, DB_NAME)
+- REST: /api/chat/rooms/:roomId/messages, /api/chat/rooms/:userId, POST rooms
+- Socket.io: join_room, send_message, leave_room → DB 저장 후 message_received 등
+- CORS: 5173, 3000 + Socket 동일 정책
+
+
+--------------------------------------------------------------------------------
+4. Python AI (server-ai)
+--------------------------------------------------------------------------------
+- 기존 /analyze/parts, /contract/generate 유지
+- 추가: POST /api/recommend-parts, POST /api/generate-contract
+- GET /health → service: factory-link-ai
+- CORS 확장 (5173, 3000, 8080 등)
+- 기동 시 OPENAI_API_KEY 필수 (lifespan 검증)
+- requirements: python-dotenv 등
+
+
+--------------------------------------------------------------------------------
+5. DevOps
+--------------------------------------------------------------------------------
+- devops/docker-compose.yml: MariaDB 10.6, init 스크립트, healthcheck
+- 서비스: mariadb, server-spring, server-node, server-ai, client
+- 루트 Makefile (up / down / logs / fresh / ps)
+- devops/.env.example 확장 (DB, JWT, OpenAI, VITE_*)
+- Spring·Node Dockerfile 정리, client는 nginx 멀티스테이지 + Vite 빌드 ARG
+
+
+--------------------------------------------------------------------------------
+6. Git
+--------------------------------------------------------------------------------
+- 위 변경사항 커밋 후 origin/main 푸시 (저장소: github.com/MadSadly/FactoryLink 등)
+
+
+--------------------------------------------------------------------------------
+7. 후속 작업 (2026-03-29 추가 세션)
+--------------------------------------------------------------------------------
+[환경 변수]
+- devops/.env.example 단일 템플릿 강화, client/server-node/server-ai .env.example
+- client/.env 로컬 템플릿 (gitignore로 커밋 제외)
+- client/src/utils/env.js — API base 정규화(/api), checkEnv(), main.jsx에서 호출
+- dev-start.bat: 로컬 기본 DB/JWT/OPENAI 값 (미설정 시에만)
+
+[CORS · Vite 프록시]
+- vite.config.js: /api/chat → 3001, /socket.io(ws), /api → 8080 순서
+- api/client.js, api/socket.js → ENV 사용, socket path /socket.io
+
+[진단 페이지]
+- /dev/connection-test — Spring 헬스·companies·Node REST·AI 헬스·Socket Ping
+- README Quick Start, API 키 안내, DB 스키마 설명 일부 갱신
+
+[카카오맵]
+- hooks/useKakaoMap.js — SDK 동적 로드
+- components/KakaoMap.jsx — 지오코딩, 권역 폴백, 타입별 마커 색, CustomOverlay
+- pages/CompaniesMapPage.jsx — 필터·목록·지도·상세 드로어
+- 라우트 /companies, 사이드바 「업체 지도」
+- VITE_KAKAO_MAP_KEY 없을 때 안내 배너
+
+[기타]
+- ChatPage: 서버 이벤트명 정합 (join_room, send_message, message_received)
+- GitHub Actions docker build용 env 보강 (OPENAI, JWT_EXPIRATION_MS, VITE_*)
+- client Dockerfile: VITE_* 빌드 인자
+
+
+--------------------------------------------------------------------------------
+8. 사용 시 참고
+--------------------------------------------------------------------------------
+- Docker: docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
+- 로컬: MariaDB factory_link + devops/.env 또는 dev-start.bat 기본값과 DB 계정 일치 필요
+- 카카오맵: developers.kakao.com 에서 JS 키 발급, Web 플랫폼에 http://localhost:5173 등록
+- 회원가입 API는 companyId 필수 — 클라이언트 Signup 연동 시 body에 포함 필요
+
+
+================================================================================
+문서 끝
+================================================================================

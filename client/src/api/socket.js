@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
+import { ENV } from "../utils/env";
 
-const chatSocketUrl = import.meta.env.VITE_CHAT_SERVER_URL || "http://localhost:3001";
-
-export const chatSocket = io(chatSocketUrl, {
+export const chatSocket = io(ENV.SOCKET_URL, {
   autoConnect: false,
+  path: "/socket.io",
 });

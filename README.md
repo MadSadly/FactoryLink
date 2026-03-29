@@ -1,5 +1,26 @@
 # Factory-Link B2B Platform (초기 골격)
 
+## Quick Start
+
+1. `cp devops/.env.example devops/.env` (Windows: `Copy-Item devops\.env.example devops\.env`)
+2. `cp client/.env.example client/.env`
+3. 필수 값 채우기: `DB_PASS`, `JWT_SECRET`(32바이트 이상), `OPENAI_API_KEY`, `VITE_KAKAO_MAP_KEY`(지도 사용 시)
+4. 전체 스택 기동: `make build` 또는  
+   `docker compose --env-file devops/.env -f devops/docker-compose.yml up --build`
+
+### Getting API Keys
+
+- **Kakao Map (JavaScript 키):** [Kakao Developers](https://developers.kakao.com) → 내 애플리케이션 → 앱 키 → JavaScript 키 → 플랫폼 Web에 `http://localhost:5173` 등록
+- **OpenAI:** [API keys](https://platform.openai.com/api-keys)
+- **JWT Secret (로컬 생성 예시):**  
+  `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+### 연결 진단 (개발용)
+
+- 브라우저에서 `http://localhost:5173/dev/connection-test` — Spring / Node / AI / Socket.io 상태 확인
+
+---
+
 Factory-Link는 제조사 간 부품 거래를 위한 B2B 플랫폼 초기 구조입니다.
 5일 내 MVP 구축을 목표로 `Spring + Node + Python AI + React` 멀티 서비스 구조로 설계했습니다.
 
@@ -65,15 +86,14 @@ Windows PowerShell에서는 `copy` 대신 `Copy-Item`을 써도 됩니다.
 - **Vite 프록시**: `client/vite.config.js`에서 `http://localhost:5173/api/*` → `http://localhost:8080/api/*` 로 전달합니다.  
   그래서 `npm run dev` 시에는 `client/src/api/client.js`가 기본으로 **`/api`** 를 쓰고, 브라우저는 CORS 없이 같은 출처(`5173`)만 호출합니다.
 - **CORS**: 프록시로 직접 `8080`을 호출할 때도 되도록, Spring에 `CorsConfig`로 `localhost:5173` 을 허용했습니다.
-- **DB**: MariaDB 없이 Spring만 띄우려면 **`local` 프로필**을 쓰면 `H2` 인메모리 DB로 기동합니다 (`application-local.yml`).
+- **DB**: Spring Boot는 **`DB_USER` / `DB_PASS` / `JWT_SECRET`** 환경 변수가 필요합니다 (`application.yml`). MariaDB에 `factory_link` DB를 준비하세요.
 
 **실행 순서 (예시)**
 
-1. **터미널 A — Spring** (MariaDB 없이 로컬만)
-   - PowerShell: `$env:SPRING_PROFILES_ACTIVE="local"`
+1. **터미널 A — Spring** (MariaDB + 위 환경 변수)
    - `server-spring` 폴더에서 **`.\mvnw.cmd spring-boot:run`** (Maven 전역 설치 없이 동작, 프로젝트에 Wrapper 포함)
    - Mac/Linux: `./mvnw spring-boot:run`
-   - 또는 IDE에서 Run + Active profiles: `local`
+   - Windows에서 한 번에 띄울 때는 루트 **`dev-start.bat`** 이 기본 환경 변수를 잡아 줍니다(필요 시 `devops/.env`와 맞출 것).
 2. **터미널 B — React**
    - `client` 폴더에서 `npm run dev`
 3. 브라우저에서 `http://localhost:5173` → 부품 화면이 `GET /api/parts` 를 호출합니다.
@@ -94,9 +114,9 @@ D:\Factory-Link\dev-start.bat
 1. **`client`**, **`server-node`**: `npm install`
 2. **`server-ai`**: `pip install -r requirements.txt`
 3. 새 창 4개에서 각각 기동:
-   - Spring (`local` 프로필, `8080`)
-   - Node 채팅 (`3001`)
-   - AI FastAPI (`8000`)
+   - Spring (`8080`, DB/JWT/OpenAI 등 환경 변수 상속)
+   - Node 채팅 (`3001`, `DB_*` 필수)
+   - AI FastAPI (`8000`, `OPENAI_API_KEY` 필수)
    - Vite 클라이언트 (`5173`)
 
 **주의:** 이미 **8080·3001·8000·5173** 을 쓰는 프로그램이 있으면 실패합니다. 이전에 띄운 서버 창을 닫거나, `taskkill` 등으로 포트를 비우세요.
@@ -156,7 +176,7 @@ docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
 - 예시 엔드포인트: `GET /api/parts`, `GET /api/health`
 
 ### Client ↔ Node Chat
-- `client/src/api/socket.js`에서 `VITE_CHAT_SERVER_URL`로 Socket 연결
+- `client/src/api/socket.js`에서 `VITE_SOCKET_URL`(또는 하위 호환 `VITE_CHAT_SERVER_URL`)로 Socket 연결
 - 이벤트:
   - `join-room`: 1:1 채팅방 참여
   - `chat-message`: 메시지 송수신
@@ -177,16 +197,11 @@ docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
 
 ## 4. DB 스키마
 
-요구 테이블은 `server-spring/src/main/resources/schema.sql`에 정의되어 있습니다.
+Docker 초기화 및 로컬 참고용 스키마는 **`db/schema.sql`** (시드: **`db/seed.sql`**)과 동일 내용이 `server-spring/src/main/resources/schema.sql`에도 있습니다.
 
-- `FACTORY`
-- `USER_ACCOUNT`
-- `PART`
-- `CHAT_ROOM`
-- `CONTRACT`
-- `CHAT_MESSAGE`
+- `companies`, `users`, `parts`, `chat_rooms`, `chat_messages`, `contracts`
 
-ERD 문서는 `docs/ERD.md`에서 확인할 수 있습니다.
+ERD 문서는 `docs/ERD.md`에서 확인할 수 있습니다(있는 경우).
 
 ## 5. CI/CD 개요
 

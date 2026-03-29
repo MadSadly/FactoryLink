@@ -59,7 +59,11 @@ jobs:
           DB_USER: factorylink
           DB_PASS: factorylink123
           JWT_SECRET: ci_jwt_secret_value_must_be_at_least_32_chars_xx
-          OPENAI_API_KEY: ""
+          JWT_EXPIRATION_MS: "86400000"
+          OPENAI_API_KEY: sk-ci-placeholder-openai-key-not-used-at-build
+          VITE_API_BASE_URL: http://localhost:8080/api
+          VITE_SOCKET_URL: http://localhost:3001
+          VITE_KAKAO_MAP_KEY: ""
         run: docker compose -f devops/docker-compose.yml build
 
       - name: Deploy Placeholder

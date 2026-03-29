@@ -5,12 +5,28 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import mysql from "mysql2/promise";
 
+const requiredEnv = ["DB_HOST", "DB_USER", "DB_PASS", "DB_NAME"];
+const missingEnv = requiredEnv.filter(
+  (k) => !process.env[k] || String(process.env[k]).trim() === ""
+);
+if (missingEnv.length) {
+  console.error("Missing env vars:", missingEnv.join(", "));
+  process.exit(1);
+}
+
 const PORT = Number(process.env.PORT || 3001);
-const DB_HOST = process.env.DB_HOST || "localhost";
+const DB_HOST = process.env.DB_HOST;
 const DB_PORT = Number(process.env.DB_PORT || 3306);
-const DB_NAME = process.env.DB_NAME || "factory_link";
-const DB_USER = process.env.DB_USER || "root";
-const DB_PASS = process.env.DB_PASS || "root";
+const DB_NAME = process.env.DB_NAME;
+const DB_USER = process.env.DB_USER;
+const DB_PASS = process.env.DB_PASS;
+
+const CORS_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
 
 const pool = mysql.createPool({
   host: DB_HOST,
@@ -25,8 +41,9 @@ const pool = mysql.createPool({
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: CORS_ORIGINS,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
 app.use(express.json());
@@ -178,8 +195,9 @@ app.post("/api/chat/rooms", async (req, res) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: CORS_ORIGINS,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 

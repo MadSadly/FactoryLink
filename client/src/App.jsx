@@ -8,6 +8,8 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import BuyerDashboard from "./pages/BuyerDashboard";
+import CompaniesMapPage from "./pages/CompaniesMapPage";
+import ConnectionTest from "./pages/ConnectionTest";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -20,6 +22,8 @@ export default function App() {
 
       <Route element={<PortalLayout />}>
         <Route path="/dashboard" element={<BuyerDashboard />} />
+        <Route path="/companies" element={<CompaniesMapPage />} />
+        <Route path="/dev/connection-test" element={<ConnectionTest />} />
         <Route path="/" element={<PartsPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
         <Route

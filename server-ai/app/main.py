@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from typing import Any, Literal, Optional
 
 import numpy as np
@@ -13,12 +14,29 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 load_dotenv()
 
-app = FastAPI(title="Factory-Link AI Service")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    required_vars = ["OPENAI_API_KEY"]
+    missing = [v for v in required_vars if not (os.getenv(v) or "").strip()]
+    if missing:
+        raise RuntimeError(f"Missing required environment variables: {missing}")
+    yield
+
+
+app = FastAPI(title="Factory-Link AI Service", lifespan=lifespan)
 vectorizer = TfidfVectorizer()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -21,7 +21,15 @@ public class JwtTokenProvider {
   public JwtTokenProvider(
       @Value("${app.jwt.secret}") String secret,
       @Value("${app.jwt.expiration-ms}") long expirationMs) {
-    this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    if (secret == null || secret.isBlank()) {
+      throw new IllegalStateException("JWT_SECRET (app.jwt.secret) must not be blank.");
+    }
+    byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+    if (keyBytes.length < 32) {
+      throw new IllegalStateException(
+          "JWT_SECRET must be at least 32 bytes for HS256 signing. See devops/.env.example.");
+    }
+    this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     this.expirationMs = expirationMs;
   }
 

@@ -6,6 +6,16 @@ REM 프로젝트 루트 (이 bat 파일이 있는 폴더)
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
+REM Local dev defaults (override in shell or match devops/.env)
+if not defined DB_HOST set "DB_HOST=localhost"
+if not defined DB_PORT set "DB_PORT=3306"
+if not defined DB_USER set "DB_USER=factorylink"
+if not defined DB_PASS set "DB_PASS=factorylink123"
+if not defined DB_NAME set "DB_NAME=factory_link"
+if not defined JWT_SECRET set "JWT_SECRET=local-dev-jwt-secret-must-be-32-bytes-min-xx"
+if not defined JWT_EXPIRATION_MS set "JWT_EXPIRATION_MS=86400000"
+if not defined OPENAI_API_KEY set "OPENAI_API_KEY=sk-local-placeholder-not-for-production-use"
+
 echo ============================================
 echo  Factory-Link - 의존성 설치 + 서버 기동
 echo  (Spring은 MariaDB factory_link DB가 필요합니다. Docker: devops\docker-compose.yml 의 mariadb 만 띄우거나 전체 스택 사용)
@@ -63,7 +73,7 @@ timeout /t 12 /nobreak >nul
 REM Node 채팅 (3001)
 start "Factory-Link Chat" cmd /k cd /d "%ROOT%server-node" ^&^& npm run dev
 
-REM AI (8000)
+REM AI (8000) — OPENAI_API_KEY required by server-ai startup
 start "Factory-Link AI" cmd /k cd /d "%ROOT%server-ai" ^&^& python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 timeout /t 2 /nobreak >nul

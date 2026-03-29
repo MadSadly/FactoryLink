@@ -39,6 +39,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
       AI_SERVER_URL: http://server-ai:8000
     depends_on:
       mariadb:
@@ -68,12 +69,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
 
   client:
     build:
       context: ../client
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3001}
+        VITE_KAKAO_MAP_KEY: ${VITE_KAKAO_MAP_KEY:-}
     ports:
       - "5173:80"
     depends_on:
