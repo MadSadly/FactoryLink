@@ -16,9 +16,7 @@ export default function PartsPage() {
     <div className="space-y-8">
       <div>
         <h2 className="mb-2 text-3xl font-extrabold tracking-tight text-on-surface">부품 목록</h2>
-        <p className="text-on-surface-variant">
-          마켓플레이스에서 조달 가능한 부품을 확인합니다. (API 연동 샘플)
-        </p>
+        <p className="text-stone-600">등록된 부품을 조회합니다.</p>
       </div>
 
       <div className={cardClass}>

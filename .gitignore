@@ -8,5 +8,11 @@ __pycache__/
 devops/.env
 devops/mariadb-data/
 server-spring/target/
+db/gg_import_*.sql
+# Python 등이 덮어쓰는 대용량 SQL — 폴더는 유지, 내용만 무시
+db/generated/**
+!db/generated/.gitignore
+db/csv-path-utf8.txt
+data/ksc.csv
 .idea/
 .vscode/

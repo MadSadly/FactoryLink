@@ -1,12 +1,6 @@
-/*
-  Kakao Map 설정 방법:
-  1. https://developers.kakao.com 접속 → 내 애플리케이션 → 애플리케이션 추가
-  2. 앱 키 → JavaScript 키 복사 → client/.env 의 VITE_KAKAO_MAP_KEY에 입력
-  3. 플랫폼 → Web → 사이트 도메인에 http://localhost:5173 추가 (필수)
-*/
+/* 카카오맵: 앱 설정에서 JavaScript 키·허용 도메인을 등록하세요. */
 
 import { useEffect, useRef } from "react";
-import { useKakaoMap } from "../hooks/useKakaoMap";
 
 const REGION_CENTER = {
   SEOUL: { lat: 37.5665, lng: 126.978 },
@@ -55,15 +49,17 @@ export default function KakaoMap({
   companies = [],
   onMarkerClick,
   height = "500px",
+  sdkReady = true,
+  /** 지역 코드(예: SEOUL) — 바뀌면 지도 중심을 해당 권역으로 이동 */
+  regionFocus = "",
 }) {
-  const isLoaded = useKakaoMap();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const overlaysRef = useRef([]);
 
   useEffect(() => {
-    if (!isLoaded || !containerRef.current || !window.kakao?.maps) {
+    if (!sdkReady || !containerRef.current || !window.kakao?.maps) {
       return;
     }
 
@@ -76,8 +72,23 @@ export default function KakaoMap({
     const map = new kakao.maps.Map(el, {
       center,
       level: MAP_LEVEL,
+      scrollwheel: true,
     });
     mapRef.current = map;
+
+    // 일부 카카오맵 JS 빌드에서 ScaleControl 등이 생성자로 없어 예외가 납니다. MapType/Zoom만 안전하게 추가합니다.
+    try {
+      const MC = kakao.maps.MapTypeControl;
+      const ZC = kakao.maps.ZoomControl;
+      if (typeof MC === "function") {
+        map.addControl(new MC(), kakao.maps.ControlPosition.TOPRIGHT);
+      }
+      if (typeof ZC === "function") {
+        map.addControl(new ZC(), kakao.maps.ControlPosition.RIGHT);
+      }
+    } catch (e) {
+      console.warn("Kakao map controls:", e);
+    }
 
     const geocoder = new kakao.maps.services.Geocoder();
 
@@ -185,12 +196,21 @@ export default function KakaoMap({
       clearLayers();
       mapRef.current = null;
     };
-  }, [isLoaded, companies, onMarkerClick]);
+  }, [sdkReady, companies, onMarkerClick]);
+
+  useEffect(() => {
+    if (!sdkReady || !regionFocus || !mapRef.current || !window.kakao?.maps) return;
+    const kakao = window.kakao;
+    const c = REGION_CENTER[regionFocus];
+    if (!c) return;
+    mapRef.current.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+    mapRef.current.setLevel(7);
+  }, [regionFocus, sdkReady]);
 
   return (
     <div
       ref={containerRef}
-      className="w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700"
+      className="w-full overflow-hidden rounded-xl border border-gray-700 bg-gray-900"
       style={{ height }}
     />
   );

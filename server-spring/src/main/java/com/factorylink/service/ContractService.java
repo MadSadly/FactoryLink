@@ -153,6 +153,30 @@ public class ContractService {
     }
   }
 
+  /** 확정(FINALIZED)된 계약을 거래 완료(COMPLETED)로 바꿉니다. 이후 상대방에 대한 리뷰 작성이 가능합니다. */
+  @Transactional
+  public Contract complete(Long id) {
+    try {
+      var principal = SecurityUtils.requirePrincipal();
+      Contract contract = contractMapper.selectById(id);
+      if (contract == null) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "계약을 찾을 수 없습니다.");
+      }
+      requireParty(principal, contract);
+      if (!"FINALIZED".equals(contract.getStatus())) {
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "확정된 계약만 거래 완료 처리할 수 있습니다.");
+      }
+      contractMapper.updateStatus(id, "COMPLETED");
+      return contractMapper.selectById(id);
+    } catch (ResponseStatusException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ResponseStatusException(
+          HttpStatus.INTERNAL_SERVER_ERROR, "거래 완료 처리 중 오류가 발생했습니다.");
+    }
+  }
+
   private static void requireParty(JwtUserPrincipal principal, Contract c) {
     Long cid = principal.getCompanyId();
     if (cid == null

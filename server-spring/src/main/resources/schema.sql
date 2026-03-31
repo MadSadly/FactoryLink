@@ -3,6 +3,7 @@
 
 SET NAMES utf8mb4;
 
+DROP TABLE IF EXISTS company_reviews;
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS contracts;
 DROP TABLE IF EXISTS chat_rooms;
@@ -20,10 +21,15 @@ CREATE TABLE IF NOT EXISTS companies (
   contact_email VARCHAR(100),
   contact_phone VARCHAR(20),
   type ENUM('BUYER','SELLER','BOTH') NOT NULL DEFAULT 'BOTH',
+  business_number VARCHAR(20) NULL COMMENT '사업자등록번호(하이픈 포함 형식, MVP 모의 인증)',
+  external_source VARCHAR(32) NULL COMMENT '공공 API 등 출처 식별자',
+  external_key CHAR(64) NULL COMMENT '출처 내 멱등 키(SHA-256 hex 등)',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_companies_region (region),
-  INDEX idx_companies_type (type)
+  INDEX idx_companies_type (type),
+  UNIQUE KEY uq_companies_business_number (business_number),
+  UNIQUE KEY uq_companies_external (external_source, external_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -92,7 +98,7 @@ CREATE TABLE IF NOT EXISTS contracts (
   unit_price DECIMAL(15,2) NOT NULL,
   total_price DECIMAL(15,2) NOT NULL,
   contract_text LONGTEXT,
-  status ENUM('DRAFT','FINALIZED') NOT NULL DEFAULT 'DRAFT',
+  status ENUM('DRAFT','FINALIZED','COMPLETED') NOT NULL DEFAULT 'DRAFT',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_contracts_room FOREIGN KEY (room_id) REFERENCES chat_rooms (id),
   CONSTRAINT fk_contracts_buyer FOREIGN KEY (buyer_company_id) REFERENCES companies (id),
@@ -101,4 +107,19 @@ CREATE TABLE IF NOT EXISTS contracts (
   INDEX idx_contracts_room (room_id),
   INDEX idx_contracts_buyer (buyer_company_id),
   INDEX idx_contracts_seller (seller_company_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS company_reviews (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  contract_id BIGINT NOT NULL,
+  reviewer_company_id BIGINT NOT NULL,
+  reviewed_company_id BIGINT NOT NULL,
+  rating TINYINT NOT NULL,
+  comment TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_company_reviews_contract FOREIGN KEY (contract_id) REFERENCES contracts (id),
+  CONSTRAINT fk_company_reviews_reviewer FOREIGN KEY (reviewer_company_id) REFERENCES companies (id),
+  CONSTRAINT fk_company_reviews_reviewed FOREIGN KEY (reviewed_company_id) REFERENCES companies (id),
+  UNIQUE KEY uq_company_reviews_contract_reviewer (contract_id, reviewer_company_id),
+  INDEX idx_company_reviews_reviewed (reviewed_company_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

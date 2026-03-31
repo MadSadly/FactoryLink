@@ -68,4 +68,14 @@ public class ContractController {
       throw e;
     }
   }
+
+  @PatchMapping("/{id}/complete")
+  public ResponseEntity<ApiResponse<Contract>> complete(@PathVariable Long id) {
+    try {
+      return ResponseEntity.ok(
+          ApiResponse.ok(contractService.complete(id), "거래가 완료 처리되었습니다."));
+    } catch (Exception e) {
+      throw e;
+    }
+  }
 }

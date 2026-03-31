@@ -3,9 +3,60 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.factorylink.mapper.CompanyMapper">
 
+  <sql id="catalogWhere">
+    <where>
+      <if test="region != null and region != ''">
+        AND c.region = #{region}
+      </if>
+      <if test="type != null and type != ''">
+        AND c.type = #{type}
+      </if>
+    </where>
+  </sql>
+
+  <select id="countCatalog" resultType="int">
+    SELECT COUNT(*) FROM companies c
+    <include refid="catalogWhere"/>
+  </select>
+
+  <select id="selectCatalogWithStats" resultType="com.factorylink.dto.CompanyListItem">
+    SELECT c.id, c.name, c.region, c.address, c.contact_email AS contactEmail, c.contact_phone AS contactPhone,
+           c.type, c.business_number AS businessNumber,
+           c.created_at AS createdAt, c.updated_at AS updatedAt,
+           COALESCE(rm.avg_rating, 0) AS avgRating,
+           COALESCE(rm.cnt, 0) AS reviewCount
+    FROM companies c
+    LEFT JOIN (
+      SELECT reviewed_company_id, AVG(rating) AS avg_rating, COUNT(*) AS cnt
+      FROM company_reviews
+      GROUP BY reviewed_company_id
+    ) rm ON rm.reviewed_company_id = c.id
+    <include refid="catalogWhere"/>
+    ORDER BY c.id ASC
+  </select>
+
+  <select id="selectCatalogPageByReview" resultType="com.factorylink.dto.CompanyListItem">
+    SELECT c.id, c.name, c.region, c.address, c.contact_email AS contactEmail, c.contact_phone AS contactPhone,
+           c.type, c.business_number AS businessNumber,
+           c.created_at AS createdAt, c.updated_at AS updatedAt,
+           COALESCE(rm.avg_rating, 0) AS avgRating,
+           COALESCE(rm.cnt, 0) AS reviewCount
+    FROM companies c
+    LEFT JOIN (
+      SELECT reviewed_company_id, AVG(rating) AS avg_rating, COUNT(*) AS cnt
+      FROM company_reviews
+      GROUP BY reviewed_company_id
+    ) rm ON rm.reviewed_company_id = c.id
+    <include refid="catalogWhere"/>
+    ORDER BY COALESCE(rm.avg_rating, 0) DESC, COALESCE(rm.cnt, 0) DESC, c.id ASC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
   <select id="selectList" resultType="com.factorylink.entity.Company">
     SELECT id, name, region, address, contact_email AS contactEmail, contact_phone AS contactPhone,
-           type, created_at AS createdAt, updated_at AS updatedAt
+           type, business_number AS businessNumber,
+           external_source AS externalSource, external_key AS externalKey,
+           created_at AS createdAt, updated_at AS updatedAt
     FROM companies
     <where>
       <if test="region != null and region != ''">
@@ -20,9 +71,24 @@
 
   <select id="selectById" resultType="com.factorylink.entity.Company">
     SELECT id, name, region, address, contact_email AS contactEmail, contact_phone AS contactPhone,
-           type, created_at AS createdAt, updated_at AS updatedAt
+           type, business_number AS businessNumber,
+           external_source AS externalSource, external_key AS externalKey,
+           created_at AS createdAt, updated_at AS updatedAt
     FROM companies WHERE id = #{id}
   </select>
+
+  <insert id="upsertByExternalKey">
+    INSERT INTO companies (name, region, address, contact_email, contact_phone, type, external_source, external_key)
+    VALUES (
+      #{name}, #{region}, #{address}, #{contactEmail}, #{contactPhone}, #{type}, #{externalSource}, #{externalKey}
+    )
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      address = VALUES(address),
+      contact_phone = VALUES(contact_phone),
+      type = VALUES(type),
+      updated_at = CURRENT_TIMESTAMP
+  </insert>
 
   <update id="update">
     UPDATE companies
@@ -32,6 +98,7 @@
       <if test="contactEmail != null">contact_email = #{contactEmail},</if>
       <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
       <if test="type != null">type = #{type},</if>
+      <if test="businessNumber != null">business_number = #{businessNumber},</if>
     </set>
     WHERE id = #{id}
   </update>

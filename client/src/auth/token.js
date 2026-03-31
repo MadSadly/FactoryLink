@@ -15,3 +15,36 @@ export function getRoleFromToken(token) {
   if (!payload) return "GUEST";
   return payload.role || payload.auth || "USER";
 }
+
+/** JWT subject(일반적으로 이메일) */
+export function getEmailFromToken(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.sub) return "";
+  return String(payload.sub);
+}
+
+/** Spring JWT claim `companyId` */
+export function getCompanyIdFromToken(token) {
+  const payload = decodeJwtPayload(token);
+  if (payload?.companyId == null) return null;
+  const v = payload.companyId;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Spring JWT claim `userId` */
+export function getUserIdFromToken(token) {
+  const payload = decodeJwtPayload(token);
+  if (payload?.userId == null) return null;
+  const v = payload.userId;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}

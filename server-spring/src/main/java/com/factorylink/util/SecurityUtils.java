@@ -18,6 +18,15 @@ public final class SecurityUtils {
     return principal;
   }
 
+  /** JWT가 없거나 익명이면 null. */
+  public static Long optionalCompanyId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof JwtUserPrincipal principal)) {
+      return null;
+    }
+    return principal.getCompanyId();
+  }
+
   public static void requireCompany(JwtUserPrincipal principal, Long companyId) {
     if (companyId == null
         || principal.getCompanyId() == null

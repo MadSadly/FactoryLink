@@ -11,8 +11,8 @@ export default function ForbiddenPage() {
           요청하신 페이지는 현재 계정 권한으로 열 수 없습니다. 관리자에게 문의하거나 다른 계정으로 로그인하세요.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
-          <Link to="/" className={btnSecondaryClass}>
-            부품 목록으로
+          <Link to="/dashboard" className={btnSecondaryClass}>
+            대시보드로
           </Link>
           <Link to="/login" className={btnSecondaryClass}>
             로그인

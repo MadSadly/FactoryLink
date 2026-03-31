@@ -1,10 +1,12 @@
 package com.factorylink.controller;
 
 import com.factorylink.dto.ApiResponse;
+import com.factorylink.dto.CompanyCatalogPage;
 import com.factorylink.dto.CompanyDetailData;
 import com.factorylink.dto.CompanyUpdateRequest;
 import com.factorylink.entity.Company;
 import com.factorylink.service.CompanyService;
+import com.factorylink.util.SecurityUtils;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,10 +28,19 @@ public class CompanyController {
   }
 
   @GetMapping
-  public ResponseEntity<ApiResponse<List<Company>>> list(
+  public ResponseEntity<?> list(
       @RequestParam(required = false) String region,
-      @RequestParam(required = false) String type) {
+      @RequestParam(required = false) String type,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
     try {
+      if (page != null) {
+        Long myCompanyId = SecurityUtils.optionalCompanyId();
+        CompanyCatalogPage catalog =
+            companyService.listCatalog(page, size != null ? size : 9, sort, region, type, myCompanyId);
+        return ResponseEntity.ok(ApiResponse.ok(catalog, "조회 완료"));
+      }
       return ResponseEntity.ok(ApiResponse.ok(companyService.list(region, type), "조회 완료"));
     } catch (Exception e) {
       throw e;

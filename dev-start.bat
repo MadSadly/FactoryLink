@@ -1,12 +1,19 @@
 @echo off
+REM ASCII-only: UTF-8/Korean in .bat breaks cmd.exe when encoding differs.
 chcp 65001 >nul
 setlocal EnableExtensions
 
-REM 프로젝트 루트 (이 bat 파일이 있는 폴더)
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
-REM Local dev defaults (override in shell or match devops/.env)
+REM Load devops\.env via PowerShell (DB_*, JWT_*, GEMINI_*, GYEONGGI_*)
+if exist "%ROOT%devops\.env" (
+  echo [info] Loading devops\.env ...
+  for /f "delims=" %%V in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%devops\export-env-for-cmd.ps1" -EnvFilePath "%ROOT%devops\.env"') do (
+    for /f "tokens=1* delims==" %%A in ("%%V") do set "%%A=%%B"
+  )
+)
+
 if not defined DB_HOST set "DB_HOST=localhost"
 if not defined DB_PORT set "DB_PORT=3306"
 if not defined DB_USER set "DB_USER=factorylink"
@@ -14,22 +21,26 @@ if not defined DB_PASS set "DB_PASS=factorylink123"
 if not defined DB_NAME set "DB_NAME=factory_link"
 if not defined JWT_SECRET set "JWT_SECRET=local-dev-jwt-secret-must-be-32-bytes-min-xx"
 if not defined JWT_EXPIRATION_MS set "JWT_EXPIRATION_MS=86400000"
-if not defined OPENAI_API_KEY set "OPENAI_API_KEY=sk-local-placeholder-not-for-production-use"
+if not defined GEMINI_API_KEY set "GEMINI_API_KEY=gemini-local-placeholder-not-for-production-use"
+
+REM AI server port (8000 may be blocked on Windows: Hyper-V reserved range, WinError 10013)
+if not defined AI_PORT set "AI_PORT=8000"
 
 echo ============================================
-echo  Factory-Link - 의존성 설치 + 서버 기동
-echo  (Spring은 MariaDB factory_link DB가 필요합니다. Docker: devops\docker-compose.yml 의 mariadb 만 띄우거나 전체 스택 사용)
+echo  Factory-Link - install deps + start servers
+echo  Spring needs MariaDB database factory_link
+echo  If DB error 1045: set DB_USER/DB_PASS to match MariaDB
 echo ============================================
 echo.
 
-echo [1/2] npm / pip 패키지 설치 중...
+echo [1/2] npm / pip install ...
 echo.
 
 echo --- client ---
 pushd "%ROOT%client"
 call npm install
 if errorlevel 1 (
-  echo [오류] client npm install 실패
+  echo [ERROR] client npm install failed
   popd
   pause
   exit /b 1
@@ -41,7 +52,7 @@ echo --- server-node ---
 pushd "%ROOT%server-node"
 call npm install
 if errorlevel 1 (
-  echo [오류] server-node npm install 실패
+  echo [ERROR] server-node npm install failed
   popd
   pause
   exit /b 1
@@ -53,7 +64,7 @@ echo --- server-ai ---
 pushd "%ROOT%server-ai"
 python -m pip install -r requirements.txt
 if errorlevel 1 (
-  echo [오류] server-ai pip install 실패 ^(python 경로 확인^)
+  echo [ERROR] server-ai pip install failed - check python on PATH
   popd
   pause
   exit /b 1
@@ -61,38 +72,44 @@ if errorlevel 1 (
 popd
 
 echo.
-echo [2/2] 서버를 새 창에서 실행합니다. (각 창을 닫으면 해당 서버가 종료됩니다)
+echo [2/2] Starting servers in new windows ...
 echo.
 
-REM Spring (8080) - 다른 창 (^&^& 로 한 줄 명령 연결)
-start "Factory-Link Spring" cmd /k cd /d "%ROOT%server-spring" ^&^& mvnw.cmd spring-boot:run
+start "Factory-Link Spring" cmd /k cd /d "%ROOT%server-spring" ^&^& call spring-boot-with-env.bat
 
-REM 기동 대기 (첫 실행 시 Maven 다운로드로 더 걸릴 수 있음)
 timeout /t 12 /nobreak >nul
 
-REM Node 채팅 (3001)
 start "Factory-Link Chat" cmd /k cd /d "%ROOT%server-node" ^&^& npm run dev
 
-REM AI (8000) — OPENAI_API_KEY required by server-ai startup
-start "Factory-Link AI" cmd /k cd /d "%ROOT%server-ai" ^&^& python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+REM Use 127.0.0.1 (not 0.0.0.0) to avoid WinError 10013 on some Windows setups
+start "Factory-Link AI" cmd /k cd /d "%ROOT%server-ai" ^&^& python -m uvicorn app.main:app --reload --host 127.0.0.1 --port %AI_PORT%
 
 timeout /t 2 /nobreak >nul
 
-REM Vite (5173)
 start "Factory-Link Client" cmd /k cd /d "%ROOT%client" ^&^& npm run dev
 
 echo.
 echo ============================================
-echo  기동 요약
+echo  URLs
 echo ============================================
-echo  Spring API : http://localhost:8080/api/health
-echo  채팅 서버  : http://localhost:3001/health
-echo  AI 서버    : http://localhost:8000/health
-echo  웹 화면    : http://localhost:5173
+echo  Spring : http://localhost:8080/api/health
+echo  Chat   : http://localhost:3001/health
+echo  AI     : http://localhost:8000/health
+echo  Web    : http://localhost:5173
+echo ============================================
 echo.
-echo  연결 확인은 health-check.bat 실행 또는 위 주소를 브라우저에서 여세요.
-echo  README.md 의 "연결 확인 방법" 절을 참고하세요.
-echo ============================================
+
+echo [3/3] Health check (first Maven build may take 1-2 min) ...
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%devops\verify-local-stack.ps1" -AiPort %AI_PORT%
+
+echo.
+if errorlevel 1 (
+  echo [NOTE] If something failed: check MariaDB, devops\.env DB_*, and CMD window logs.
+  echo        Or run health-check.bat when servers are already up.
+) else (
+  echo [OK] Open http://localhost:5173/companies when ready.
+)
 echo.
 pause
 endlocal

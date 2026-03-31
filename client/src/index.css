@@ -2,16 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-surface font-body text-on-surface antialiased;
+@layer base {
+  html {
+    @apply selection:bg-orange-200 selection:text-orange-900;
+  }
+  body {
+    @apply bg-[#FAFAFA] font-sans font-normal text-stone-800 antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d6d3d1 #f5f5f4;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply rounded-full bg-stone-100;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-stone-300 hover:bg-stone-400;
+  }
+}
+
+@layer utilities {
+  /* 업체 지도 목록 등 다크 패널용 스크롤 */
+  .fl-scroll-ember {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 84, 26, 0.55) rgba(30, 20, 15, 0.6);
+  }
+  .fl-scroll-ember::-webkit-scrollbar {
+    width: 8px;
+  }
+  .fl-scroll-ember::-webkit-scrollbar-track {
+    @apply rounded-full bg-[#1a120e]/80;
+  }
+  .fl-scroll-ember::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gradient-to-b from-[#d4541a]/90 to-[#7d2a0a]/90 hover:from-[#e8722a] hover:to-[#9a3a12];
+  }
+
+  .fl-scroll-light {
+    scrollbar-width: thin;
+    scrollbar-color: #d6d3d1 #f5f5f4;
+  }
+  .fl-scroll-light::-webkit-scrollbar {
+    width: 8px;
+  }
+  .fl-scroll-light::-webkit-scrollbar-track {
+    @apply rounded-full bg-stone-100;
+  }
+  .fl-scroll-light::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-stone-300 hover:bg-stone-400;
+  }
+
+  .sidebar-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
 }
 
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   vertical-align: middle;
-}
-
-.flat-ledger-style {
-  box-shadow: none;
-  border-right: 1px solid rgba(194, 198, 216, 0.2);
 }

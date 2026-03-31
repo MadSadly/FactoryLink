@@ -4,14 +4,14 @@
 
 1. `cp devops/.env.example devops/.env` (Windows: `Copy-Item devops\.env.example devops\.env`)
 2. `cp client/.env.example client/.env`
-3. 필수 값 채우기: `DB_PASS`, `JWT_SECRET`(32바이트 이상), `OPENAI_API_KEY`, `VITE_KAKAO_MAP_KEY`(지도 사용 시)
+3. 필수 값 채우기: `DB_PASS`, `JWT_SECRET`(32바이트 이상), `GEMINI_API_KEY`(유사도·계약서 생성), `VITE_KAKAO_MAP_KEY`(지도 사용 시)
 4. 전체 스택 기동: `make build` 또는  
    `docker compose --env-file devops/.env -f devops/docker-compose.yml up --build`
 
 ### Getting API Keys
 
 - **Kakao Map (JavaScript 키):** [Kakao Developers](https://developers.kakao.com) → 내 애플리케이션 → 앱 키 → JavaScript 키 → 플랫폼 Web에 `http://localhost:5173` 등록
-- **OpenAI:** [API keys](https://platform.openai.com/api-keys)
+- **Gemini (Google AI Studio):** [API keys](https://aistudio.google.com/app/apikey?hl=ko) — 임베딩·계약서 생성 동일 키
 - **JWT Secret (로컬 생성 예시):**  
   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
@@ -57,7 +57,7 @@ Factory-Link는 제조사 간 부품 거래를 위한 B2B 플랫폼 초기 구�
 - **`client`**: 브라우저에서 보는 화면 (React). `VITE_*` 환경 변수로 API 주소를 지정합니다.
 - **`server-spring`**: 주문·부품·계약 같은 **비즈니스 API** (Java). MariaDB와 연결합니다.
 - **`server-node`**: **실시간 채팅**만 담당 (Socket.io). 부하를 나누기 위해 분리했습니다.
-- **`server-ai`**: **ML 분석·계약서 초안** (Python). OpenAI 키가 없으면 템플릿 응답만 씁니다.
+- **`server-ai`**: **ML 분석·계약서 초안** (Python). `GEMINI_API_KEY`로 Gemini 임베딩·생성을 사용합니다.
 - **`devops`**: Docker Compose로 위 서비스를 한 번에 띄우는 설정.
 - **`.github/workflows`**: 푸시 시 빌드가 깨지지 않는지 확인하는 CI.
 
@@ -103,7 +103,8 @@ Windows PowerShell에서는 `copy` 대신 `Copy-Item`을 써도 됩니다.
 
 ### 0.4 Windows — 한 번에 설치 + 서버 기동 (`dev-start.bat`)
 
-프로젝트 **루트**에 있는 **`dev-start.bat`** 을 더블클릭하거나, CMD/PowerShell에서 실행합니다.
+프로젝트 **루트**에 있는 **`dev-start.bat`** 을 더블클릭하거나, CMD에서 실행합니다.  
+**PowerShell**에서는 `.\dev-start`처럼 확장자 없이 실행하지 말고 **`.\dev-start.bat`** 또는 **`.\dev-start.ps1`** 를 쓰세요.
 
 ```bat
 D:\Factory-Link\dev-start.bat
@@ -114,9 +115,9 @@ D:\Factory-Link\dev-start.bat
 1. **`client`**, **`server-node`**: `npm install`
 2. **`server-ai`**: `pip install -r requirements.txt`
 3. 새 창 4개에서 각각 기동:
-   - Spring (`8080`, DB/JWT/OpenAI 등 환경 변수 상속)
+   - Spring (`8080`, DB/JWT/GEMINI 등 환경 변수 상속)
    - Node 채팅 (`3001`, `DB_*` 필수)
-   - AI FastAPI (`8000`, `OPENAI_API_KEY` 필수)
+   - AI FastAPI (`8000`, `GEMINI_API_KEY` 필수)
    - Vite 클라이언트 (`5173`)
 
 **주의:** 이미 **8080·3001·8000·5173** 을 쓰는 프로그램이 있으면 실패합니다. 이전에 띄운 서버 창을 닫거나, `taskkill` 등으로 포트를 비우세요.
@@ -197,7 +198,7 @@ docker compose --env-file devops/.env -f devops/docker-compose.yml up --build
 
 ## 4. DB 스키마
 
-Docker 초기화 및 로컬 참고용 스키마는 **`db/schema.sql`** (시드: **`db/seed.sql`**)과 동일 내용이 `server-spring/src/main/resources/schema.sql`에도 있습니다.
+Docker 초기화 및 로컬 참고용 스키마는 **`db/schema.sql`**과 동일 내용이 `server-spring/src/main/resources/schema.sql`에도 있습니다. **`db/seed.sql`**은 문자셋만 설정하고 데모 행은 넣지 않습니다(업체는 공공 API 동기화 등으로 채움).
 
 - `companies`, `users`, `parts`, `chat_rooms`, `chat_messages`, `contracts`
 

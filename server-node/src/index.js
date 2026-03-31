@@ -24,6 +24,8 @@ const DB_PASS = process.env.DB_PASS;
 const CORS_ORIGINS = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
 ];
@@ -36,6 +38,7 @@ const pool = mysql.createPool({
   password: DB_PASS,
   waitForConnections: true,
   connectionLimit: 10,
+  charset: "utf8mb4",
 });
 
 const app = express();
@@ -64,7 +67,7 @@ app.get("/api/chat/rooms/:roomId/messages", async (req, res) => {
       });
     }
     let sql = `
-      SELECT m.id, m.message, m.created_at AS createdAt, u.name AS senderName
+      SELECT m.id, m.sender_user_id AS senderUserId, m.message, m.created_at AS createdAt, u.name AS senderName
       FROM chat_messages m
       JOIN users u ON u.id = m.sender_user_id
       WHERE m.room_id = ?
@@ -155,8 +158,12 @@ app.post("/api/chat/rooms", async (req, res) => {
       `SELECT id AS roomId, buyer_company_id AS buyerCompanyId, seller_company_id AS sellerCompanyId,
               part_id AS partId, status, created_at AS createdAt
        FROM chat_rooms
-       WHERE buyer_company_id = ? AND seller_company_id = ? AND part_id <=> ?`,
-      [buyerCompanyId, sellerCompanyId, partId ?? null]
+       WHERE part_id <=> ?
+         AND (
+           (buyer_company_id = ? AND seller_company_id = ?)
+           OR (buyer_company_id = ? AND seller_company_id = ?)
+         )`,
+      [partId ?? null, buyerCompanyId, sellerCompanyId, sellerCompanyId, buyerCompanyId]
     );
     if (existing.length) {
       return res.status(200).json({

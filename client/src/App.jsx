@@ -1,15 +1,19 @@
-import { Route, Routes } from "react-router-dom";
+/**
+ * 라우팅 정의. 페이지 전환 시 페이드·슬라이드 애니메이션은 PortalLayout(Outlet 래퍼)에서 처리합니다.
+ */
+import { Navigate, Route, Routes } from "react-router-dom";
 import PortalLayout from "./layouts/PortalLayout";
 import AuthLayout from "./layouts/AuthLayout";
 import ChatPage from "./pages/ChatPage";
-import PartsPage from "./pages/PartsPage";
+import CompanyListPage from "./pages/CompanyListPage";
 import AiContractPage from "./pages/AiContractPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import BuyerDashboard from "./pages/BuyerDashboard";
 import CompaniesMapPage from "./pages/CompaniesMapPage";
-import ConnectionTest from "./pages/ConnectionTest";
+import AnalysisPage from "./pages/AnalysisPage";
+import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -21,15 +25,25 @@ export default function App() {
       </Route>
 
       <Route element={<PortalLayout />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<BuyerDashboard />} />
+        <Route path="/company-list" element={<CompanyListPage />} />
+        <Route path="/parts" element={<Navigate to="/company-list" replace />} />
         <Route path="/companies" element={<CompaniesMapPage />} />
-        <Route path="/dev/connection-test" element={<ConnectionTest />} />
-        <Route path="/" element={<PartsPage />} />
+        <Route path="/analysis" element={<AnalysisPage />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={["MEMBER", "ADMIN"]}>
+              <ProfileSettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/forbidden" element={<ForbiddenPage />} />
         <Route
           path="/contract"
           element={
-            <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
+            <ProtectedRoute allowedRoles={["MEMBER", "ADMIN"]}>
               <AiContractPage />
             </ProtectedRoute>
           }
@@ -37,7 +51,7 @@ export default function App() {
         <Route
           path="/chat"
           element={
-            <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
+            <ProtectedRoute allowedRoles={["MEMBER", "ADMIN"]}>
               <ChatPage />
             </ProtectedRoute>
           }

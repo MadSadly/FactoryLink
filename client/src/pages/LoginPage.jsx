@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <div className={`${cardClass} w-full max-w-md shadow-xl`}>
       <h2 className="mb-1 text-2xl font-extrabold text-on-surface">로그인</h2>
-      <p className="mb-6 text-sm text-on-surface-variant">Factory-Link 제조 포털에 로그인합니다.</p>
+      <p className="mb-6 text-sm text-stone-600">Factory-Link 계정으로 로그인합니다.</p>
       <form className="space-y-4" onSubmit={handleLogin}>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">이메일</label>

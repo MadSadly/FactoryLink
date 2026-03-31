@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiClient } from "../api/client";
+import { useNavigate } from "react-router-dom";
+import { apiClient, chatApiClient } from "../api/client";
 import KakaoMap from "../components/KakaoMap";
+import CompanyDetailModal from "../components/CompanyDetailModal";
 import { useKakaoMap } from "../hooks/useKakaoMap";
+import { useAuth } from "../auth/AuthContext";
+import { getCompanyIdFromToken } from "../auth/token";
 import { ENV } from "../utils/env";
+import { regionKo, typeKo } from "../utils/companyLabels";
 
 const REGION_OPTIONS = [
   { value: "", label: "전체" },
@@ -17,39 +22,53 @@ const REGION_OPTIONS = [
   { value: "OTHER", label: "기타" },
 ];
 
+const REGION_CHIPS = REGION_OPTIONS.filter((o) => o.value !== "");
+
 const TYPE_OPTIONS = [
   { value: "", label: "전체" },
-  { value: "BUYER", label: "구매사(BUYER)" },
-  { value: "SELLER", label: "공급사(SELLER)" },
-  { value: "BOTH", label: "구매+공급(BOTH)" },
+  { value: "BUYER", label: "구매사" },
+  { value: "SELLER", label: "공급사" },
+  { value: "BOTH", label: "구매·공급" },
 ];
 
-function typeKo(type) {
-  if (type === "BUYER") {
-    return "구매사";
-  }
-  if (type === "SELLER") {
-    return "공급사";
-  }
-  if (type === "BOTH") {
-    return "구매+공급";
-  }
-  return type || "-";
-}
+const fieldClass =
+  "rounded-xl border border-[#3d2c21] bg-[#1c1410] px-3 py-2 text-sm font-normal text-[#f5ede6] placeholder-[#7d5544] focus:border-[#d4541a] focus:outline-none focus:ring-2 focus:ring-[#d4541a]/30";
+
+const LIST_PAGE_SIZE = 20;
+
+const listScrollClass =
+  "fl-scroll-ember min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden rounded-xl border border-[#2e2018]/80 bg-[#110c0a]/40 py-2 pl-2 pr-1";
 
 export default function CompaniesMapPage() {
-  const sdkLoaded = useKakaoMap();
+  const navigate = useNavigate();
+  const { isAuthenticated, token } = useAuth();
+  const { isLoaded: sdkLoaded, loadError: sdkLoadError } = useKakaoMap();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [region, setRegion] = useState("");
   const [type, setType] = useState("");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const [selected, setSelected] = useState(null);
   const [detailParts, setDetailParts] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(LIST_PAGE_SIZE);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMsg, setChatMsg] = useState("");
+
+  useEffect(() => {
+    if (!selected) {
+      setDrawerOpen(false);
+      return;
+    }
+    setDrawerOpen(false);
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setDrawerOpen(true));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [selected?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +83,12 @@ export default function CompaniesMapPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError("업체 목록을 불러오지 못했습니다.");
+          const serverMsg = e?.response?.data?.message;
+          const detail =
+            typeof serverMsg === "string" && serverMsg.trim()
+              ? serverMsg
+              : `HTTP ${e?.response?.status ?? "오류"}`;
+          setError(`업체 목록을 불러오지 못했습니다. (${detail})`);
           setCompanies([]);
         }
       } finally {
@@ -80,27 +104,70 @@ export default function CompaniesMapPage() {
 
   const filtered = useMemo(() => {
     return companies.filter((c) => {
-      if (region && c.region !== region) {
-        return false;
-      }
-      if (type && c.type !== type) {
-        return false;
-      }
+      if (region && c.region !== region) return false;
+      if (type && c.type !== type) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        if (!String(c.name || "").toLowerCase().includes(q)) {
-          return false;
-        }
+        if (!String(c.name || "").toLowerCase().includes(q)) return false;
       }
       return true;
     });
   }, [companies, region, type, search]);
 
+  // 필터 조건이 바뀌면 목록을 처음 20개부터 다시 시작
+  useEffect(() => {
+    setVisibleCount(LIST_PAGE_SIZE);
+  }, [region, type, search]);
+
+  const visibleFiltered = useMemo(() => {
+    return filtered.slice(0, Math.min(visibleCount, filtered.length));
+  }, [filtered, visibleCount]);
+
   const mapKey = filtered.map((c) => c.id).join("-");
+
+  const closeModal = useCallback(() => {
+    setSelected(null);
+    setChatMsg("");
+  }, []);
+
+  const requestChat = async (targetCompany) => {
+    setChatMsg("");
+    if (!isAuthenticated || !token) {
+      navigate("/login");
+      return;
+    }
+    const myCid = getCompanyIdFromToken(token);
+    if (myCid == null) {
+      setChatMsg("소속 업체 정보가 없습니다. 다시 로그인해 주세요.");
+      return;
+    }
+    if (Number(targetCompany.id) === Number(myCid)) {
+      setChatMsg("자기 소속 업체와는 채팅할 수 없습니다.");
+      return;
+    }
+    setChatLoading(true);
+    try {
+      const { data } = await chatApiClient.post("/chat/rooms", {
+        buyerCompanyId: myCid,
+        sellerCompanyId: targetCompany.id,
+      });
+      const inner = data?.success ? data.data : data;
+      const rid = inner?.roomId ?? inner?.id;
+      if (rid != null) {
+        navigate(`/chat?room=${rid}`);
+        return;
+      }
+      setChatMsg("채팅방을 만들지 못했습니다.");
+    } catch (err) {
+      const m = err?.response?.data?.message;
+      setChatMsg(typeof m === "string" ? m : "채팅방 생성에 실패했습니다.");
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   const openDetail = useCallback(async (company) => {
     setSelected(company);
-    setDrawerOpen(true);
     setDetailLoading(true);
     setDetailError("");
     setDetailParts([]);
@@ -122,210 +189,261 @@ export default function CompaniesMapPage() {
     (company) => {
       openDetail(company);
     },
-    [openDetail]
+    [openDetail],
   );
 
   const hasKakaoKey = Boolean(ENV.KAKAO_MAP_KEY);
 
+  const selectRegionChip = (val) => {
+    setRegion((prev) => (prev === val ? "" : val));
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 flex-col space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-on-surface">업체 지도</h1>
-        <p className="mt-2 text-on-surface-variant">
-          지역·유형으로 업체를 찾고, 지도에서 위치를 확인하세요.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#f5ede6]">업체 지도</h1>
+        <p className="mt-2 text-sm font-normal text-[#b8907a]">지역·유형으로 업체를 찾고, 지도에서 위치를 확인하세요.</p>
       </div>
 
       {!hasKakaoKey && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
-          카카오맵 API 키를 설정해주세요. <code className="font-mono">client/.env</code> 의{" "}
-          <code className="font-mono">VITE_KAKAO_MAP_KEY</code>
+        <div className="rounded-2xl border border-amber-900/50 bg-amber-950/40 px-4 py-3 text-sm font-normal text-amber-200">
+          지도를 표시하려면 카카오맵 키가 필요합니다. 설정 후 새로고침하세요.
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
-        <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-          지역
-          <select
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className="min-w-[140px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal normal-case text-on-surface dark:border-slate-700 dark:bg-slate-900"
-          >
-            {REGION_OPTIONS.map((o) => (
-              <option key={o.value || "all"} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-          유형
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal normal-case text-on-surface dark:border-slate-700 dark:bg-slate-900"
-          >
-            {TYPE_OPTIONS.map((o) => (
-              <option key={o.value || "all"} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-          업체명 검색
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="이름으로 필터…"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal normal-case text-on-surface dark:border-slate-700 dark:bg-slate-900"
-          />
-        </label>
-      </div>
+      {hasKakaoKey && sdkLoadError && (
+        <div className="rounded-2xl border border-red-900/50 bg-red-950/40 px-4 py-3 text-sm font-normal text-red-200">
+          <p className="font-semibold">지도 SDK를 불러오지 못했습니다</p>
+          <p className="mt-1">{sdkLoadError}</p>
+        </div>
+      )}
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <section className="lg:w-[40%]">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-on-surface-variant">
-            업체 목록 ({filtered.length})
-          </h2>
-          {loading && (
-            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              목록 불러오는 중…
-            </div>
-          )}
-          {error && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-              {error}
-            </p>
-          )}
-          {!loading && !error && (
-            <ul className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
-              {filtered.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => openDetail(c)}
-                    className="w-full rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 text-left shadow-sm transition hover:border-primary/30 hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold text-on-surface">{c.name}</span>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {typeKo(c.type)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-on-surface-variant">{c.address || "주소 없음"}</p>
-                    <p className="mt-0.5 text-[10px] font-mono text-slate-400">{c.region}</p>
-                  </button>
-                </li>
-              ))}
-              {filtered.length === 0 && (
-                <li className="text-sm text-on-surface-variant">조건에 맞는 업체가 없습니다.</li>
-              )}
-            </ul>
-          )}
+      <div className="flex min-h-[min(720px,calc(100vh-11rem))] flex-1 flex-col gap-4 lg:gap-6">
+        <section className="space-y-4 rounded-2xl border border-[#2e2018] bg-[#1c1410] p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[#7d5544]">
+              지역
+              <select value={region} onChange={(e) => setRegion(e.target.value)} className={fieldClass}>
+                {REGION_OPTIONS.map((o) => (
+                  <option key={o.value || "all"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[#7d5544]">
+              유형
+              <select value={type} onChange={(e) => setType(e.target.value)} className={fieldClass}>
+                {TYPE_OPTIONS.map((o) => (
+                  <option key={o.value || "all"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[#7d5544]">
+            업체명 검색
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름으로 필터…"
+              className={fieldClass}
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-2">
+            {REGION_CHIPS.map((chip) => (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => selectRegionChip(chip.value)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                  region === chip.value
+                    ? "border-[#d4541a] bg-gradient-to-r from-[#d4541a] to-[#e8722a] text-[#f5ede6] shadow-lg shadow-[#d4541a]/25"
+                    : "border-[#3d2c21] bg-[#2a1e17] text-[#e8d5c4] hover:border-[#d4541a]/50 hover:bg-[#2a1e17]/80"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
         </section>
 
-        <section className="lg:w-[60%] lg:flex-1">
+        <section className="relative w-full space-y-2">
           {!hasKakaoKey ? (
-            <div
-              className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400"
-              style={{ minHeight: 500 }}
-            >
-              카카오맵 키를 설정하면 지도가 표시됩니다.
+            <MapEmptyState
+              title="지도를 준비 중입니다"
+              description="카카오맵 키를 설정하면 이 영역에 지도가 표시됩니다."
+            />
+          ) : sdkLoadError ? (
+            <div className="flex h-full min-h-[500px] flex-col items-center justify-center gap-2 rounded-2xl border border-red-900/50 bg-red-950/40 px-4 text-center text-sm font-normal text-red-200">
+              <span className="material-symbols-outlined text-3xl text-red-400">map</span>
+              <p>지도를 표시할 수 없습니다. 안내를 확인하세요.</p>
             </div>
           ) : !sdkLoaded ? (
             <MapLoadingPlaceholder />
           ) : (
             <KakaoMap
               key={mapKey}
+              sdkReady
               companies={filtered}
               onMarkerClick={handleMarkerClick}
               height="560px"
+              regionFocus={region}
             />
+          )}
+          {hasKakaoKey && sdkLoaded && !sdkLoadError && (
+            <p className="text-center text-[11px] font-medium text-[#7d5544]">
+              지도 위에서 스크롤로 확대·축소 · 칩(서울·경기 등)을 누르면 해당 권역으로 이동합니다
+            </p>
+          )}
+        </section>
+
+        <section className="flex min-h-0 flex-col gap-2 lg:min-h-[min(520px,55vh)]">
+          <div className="flex shrink-0 items-center justify-between gap-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#7d5544]">
+              업체 목록 ({filtered.length})
+            </h2>
+            {filtered.length > LIST_PAGE_SIZE && (
+              <span className="text-xs font-medium text-[#7d5544]">
+                표시 {Math.min(visibleCount, filtered.length)} / {filtered.length}
+              </span>
+            )}
+          </div>
+
+          {loading && (
+            <div className="flex items-center gap-2 text-sm font-normal text-[#b8907a]">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#d4541a] border-t-transparent" />
+              목록 불러오는 중…
+            </div>
+          )}
+          {error && (
+            <p className="rounded-xl border border-amber-900/40 bg-amber-950/30 px-3 py-2 text-sm font-normal text-amber-200">{error}</p>
+          )}
+
+          {!loading && !error && (
+            <>
+              <ul
+                className={listScrollClass}
+                style={{ maxHeight: "min(420px, 48vh)" }}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+                  if (remaining < 120 && visibleCount < filtered.length) {
+                    setVisibleCount((v) => Math.min(v + LIST_PAGE_SIZE, filtered.length));
+                  }
+                }}
+              >
+                {visibleFiltered.map((c) => {
+                  const registered = Boolean(c.businessNumber && String(c.businessNumber).trim());
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => openDetail(c)}
+                        className="flex w-full gap-3 rounded-2xl border border-[#2e2018] bg-[#1c1410] p-3 text-left shadow-sm transition-all duration-300 hover:border-[#d4541a]/40 hover:bg-[#2a1e17] hover:shadow-lg hover:shadow-[#7d1a00]/30"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#3d2c21] bg-[#2a1e17] text-[#f5854a] shadow-inner">
+                          <span className="material-symbols-outlined text-[26px]">factory</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-[#f5ede6]">{c.name}</span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                registered
+                                  ? "bg-[#3d2a05]/60 text-[#f0c060] ring-1 ring-[#8a6a00]/80"
+                                  : "bg-[#2a1e17] text-[#7d5544] ring-1 ring-[#3d2c21]"
+                              }`}
+                            >
+                              {registered ? "사업자 등록" : "미등록"}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#f5854a]/90">
+                            {typeKo(c.type)}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-xs font-normal text-[#b8907a]">{c.address || "주소 없음"}</p>
+                          <p className="mt-0.5 text-[11px] font-medium text-[#7d5544]">{regionKo(c.region)}</p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <li className="text-sm font-normal text-[#7d5544]">조건에 맞는 업체가 없습니다.</li>
+                )}
+              </ul>
+
+              {visibleCount < filtered.length && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#3d2c21] bg-[#2a1e17] px-4 py-2 text-sm font-semibold text-[#e8d5c4] shadow-sm transition-all hover:border-[#d4541a]/50 hover:text-[#f5ede6]"
+                    onClick={() => setVisibleCount((v) => Math.min(v + LIST_PAGE_SIZE, filtered.length))}
+                  >
+                    더보기 (+{LIST_PAGE_SIZE})
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>
 
-      {drawerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/40"
-          role="presentation"
-          onClick={() => setDrawerOpen(false)}
-        >
-          <aside
-            className="h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl dark:bg-slate-900"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-xl font-bold text-on-surface">{selected?.name}</h3>
-                <p className="text-sm text-on-surface-variant">{selected?.address || "주소 없음"}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {selected?.region} · {typeKo(selected?.type)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                onClick={() => setDrawerOpen(false)}
-                aria-label="닫기"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            {detailLoading && (
-              <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                상세 불러오는 중…
-              </div>
-            )}
-            {detailError && (
-              <p className="text-sm text-red-600 dark:text-red-400">{detailError}</p>
-            )}
-            {!detailLoading && !detailError && (
-              <div>
-                <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                  등록 부품 ({detailParts.length})
-                </h4>
-                <ul className="space-y-2">
-                  {detailParts.map((p) => (
-                    <li
-                      key={p.id}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
-                    >
-                      <span className="font-semibold">{p.name}</span>
-                      <span className="ml-2 text-xs text-slate-500">{p.category}</span>
-                      <div className="mt-1 text-xs text-on-surface-variant">
-                        재고 {p.stockQuantity ?? p.stock_quantity ?? "-"} · ₩
-                        {Number(p.unitPrice ?? p.unit_price ?? 0).toLocaleString()}
-                      </div>
-                    </li>
-                  ))}
-                  {detailParts.length === 0 && (
-                    <li className="text-sm text-on-surface-variant">등록된 부품이 없습니다.</li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </aside>
-        </div>
+      {selected && (
+        <CompanyDetailModal
+          company={selected}
+          parts={detailParts}
+          loading={detailLoading}
+          error={detailError}
+          onClose={closeModal}
+          onChatRequest={requestChat}
+          chatLoading={chatLoading}
+          chatMessage={chatMsg}
+          avgRating={selected.avgRating}
+          reviewCount={selected.reviewCount}
+        />
       )}
+    </div>
+  );
+}
+
+function MapEmptyState({ title, description }) {
+  return (
+    <div className="flex h-full min-h-[500px] items-center justify-center rounded-2xl border border-[#2e2018] bg-[#1c1410] p-8">
+      <div className="max-w-sm rounded-2xl border border-[#2e2018] bg-[#110c0a] px-8 py-10 text-center shadow-lg shadow-black/40">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#2e2018] bg-[#1c1410] text-[#f5854a]">
+          <span className="material-symbols-outlined text-[32px]">map</span>
+        </div>
+        <h3 className="text-lg font-bold text-[#f5ede6]">{title}</h3>
+        <p className="mt-2 text-sm font-normal leading-relaxed text-[#7d5544]">{description}</p>
+        <div className="mt-6 flex items-center justify-center gap-1.5" aria-hidden>
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:0ms]" />
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:200ms]" />
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:400ms]" />
+        </div>
+      </div>
     </div>
   );
 }
 
 function MapLoadingPlaceholder() {
   return (
-    <div
-      className="flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"
-      style={{ minHeight: 500 }}
-    >
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <p className="text-sm font-medium text-on-surface-variant">지도 불러오는 중…</p>
+    <div className="flex h-full min-h-[500px] flex-col items-center justify-center rounded-2xl border border-[#2e2018] bg-[#1c1410] p-8">
+      <div className="max-w-sm rounded-2xl border border-[#2e2018] bg-[#110c0a] px-8 py-10 text-center shadow-lg shadow-black/40">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#2e2018] bg-[#1c1410] text-[#f5854a]">
+          <span className="material-symbols-outlined text-[32px] animate-pulse">explore</span>
+        </div>
+        <h3 className="text-lg font-bold text-[#f5ede6]">지도 불러오는 중</h3>
+        <p className="mt-2 text-sm font-normal text-[#7d5544]">잠시만 기다려 주세요.</p>
+        <div className="mt-6 flex items-center justify-center gap-1.5" aria-hidden>
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:0ms]" />
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:200ms]" />
+          <span className="h-2 w-2 rounded-full bg-[#f5b942] animate-loading-dot [animation-delay:400ms]" />
+        </div>
+      </div>
     </div>
   );
 }
