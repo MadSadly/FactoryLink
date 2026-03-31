@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .venv/
+**/.venv/
+server-ai/.venv/
+venv/
+**/venv/
+server-ai/venv/
 __pycache__/
 *.pyc
 .env

@@ -1,10 +1,12 @@
 import { NavLink } from "react-router-dom";
+import { FileText } from "lucide-react";
 
 const items = [
   { to: "/dashboard", label: "대시보드", icon: "dashboard" },
   { to: "/company-list", label: "업체 목록", icon: "list" },
   { to: "/companies", label: "업체 지도", icon: "map" },
   { to: "/analysis", label: "협업 분석", icon: "hub" },
+  { to: "/quote", label: "견적·계약서", icon: "", lucide: FileText },
   { to: "/contract", label: "AI 계약", icon: "edit_document" },
   { to: "/chat", label: "채팅", icon: "chat" },
   { to: "/profile", label: "회사 설정", icon: "settings" },
@@ -33,12 +35,19 @@ export default function Sidebar({ isAuthenticated, onSignOut }) {
       </div>
 
       <nav className="flex flex-1 flex-row gap-1 overflow-x-auto px-2 py-3 sm:flex-col sm:overflow-x-visible sm:px-3 sm:py-4">
-        {items.map((item) => (
-          <NavLink key={item.to} to={item.to} className={linkClass} end={item.to === "/dashboard"}>
-            <span className="material-symbols-outlined text-[20px] opacity-90">{item.icon}</span>
-            <span className="whitespace-nowrap">{item.label}</span>
-          </NavLink>
-        ))}
+        {items.map((item) => {
+          const LucideIcon = item.lucide;
+          return (
+            <NavLink key={item.to} to={item.to} className={linkClass} end={item.to === "/dashboard"}>
+              {LucideIcon ? (
+                <LucideIcon className="h-[20px] w-[20px] shrink-0 opacity-90" aria-hidden />
+              ) : (
+                <span className="material-symbols-outlined text-[20px] opacity-90">{item.icon}</span>
+              )}
+              <span className="whitespace-nowrap">{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="border-t border-gray-800 px-3 py-4">

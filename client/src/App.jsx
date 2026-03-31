@@ -7,6 +7,8 @@ import AuthLayout from "./layouts/AuthLayout";
 import ChatPage from "./pages/ChatPage";
 import CompanyListPage from "./pages/CompanyListPage";
 import AiContractPage from "./pages/AiContractPage";
+import QuoteRequestPage from "./pages/QuoteRequestPage";
+import ContractPage from "./pages/ContractPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
@@ -31,6 +33,22 @@ export default function App() {
         <Route path="/parts" element={<Navigate to="/company-list" replace />} />
         <Route path="/companies" element={<CompaniesMapPage />} />
         <Route path="/analysis" element={<AnalysisPage />} />
+        <Route
+          path="/quote"
+          element={
+            <ProtectedRoute allowedRoles={["MEMBER", "ADMIN"]}>
+              <QuoteRequestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/contract/:quoteId"
+          element={
+            <ProtectedRoute allowedRoles={["MEMBER", "ADMIN"]}>
+              <ContractPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/profile"
           element={

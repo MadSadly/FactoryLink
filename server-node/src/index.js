@@ -144,6 +144,61 @@ app.get("/api/chat/rooms/:userId", async (req, res) => {
   }
 });
 
+/** REST로 채팅 메시지 삽입 (견적 PDF 링크 전송 등). 클라이언트는 JWT와 동일 사용자만 호출하도록 가정. */
+app.post("/api/chat/messages", async (req, res) => {
+  try {
+    const { roomId, userId, message } = req.body || {};
+    if (roomId == null || userId == null || message == null || String(message).trim() === "") {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        message: "roomId, userId, message가 필요합니다.",
+      });
+    }
+    const [rooms] = await pool.query("SELECT id FROM chat_rooms WHERE id = ?", [roomId]);
+    if (!rooms.length) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: "채팅방을 찾을 수 없습니다.",
+      });
+    }
+    const [users] = await pool.query("SELECT id FROM users WHERE id = ?", [userId]);
+    if (!users.length) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: "사용자를 찾을 수 없습니다.",
+      });
+    }
+    const [ins] = await pool.query(
+      `INSERT INTO chat_messages (room_id, sender_user_id, message) VALUES (?, ?, ?)`,
+      [roomId, userId, String(message)]
+    );
+    const msgId = ins.insertId;
+    const [rows] = await pool.query(
+      `SELECT m.id, m.room_id AS roomId, m.sender_user_id AS senderUserId, u.name AS senderName,
+              m.message, m.created_at AS createdAt
+       FROM chat_messages m
+       JOIN users u ON u.id = m.sender_user_id
+       WHERE m.id = ?`,
+      [msgId]
+    );
+    return res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: "메시지가 전송되었습니다.",
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: "메시지 전송 중 오류가 발생했습니다.",
+    });
+  }
+});
+
 app.post("/api/chat/rooms", async (req, res) => {
   try {
     const { buyerCompanyId, sellerCompanyId, partId } = req.body || {};

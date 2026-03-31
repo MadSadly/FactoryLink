@@ -70,6 +70,14 @@ services:
       - "8000:8000"
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: factory_link
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+    depends_on:
+      mariadb:
+        condition: service_healthy
 
   client:
     build:

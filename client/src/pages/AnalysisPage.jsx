@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiClient, chatApiClient } from "../api/client";
+import { apiClient, chatApiClient, fetchHybridRecommend, postRecommendFeedback } from "../api/client";
 import CompanyDetailModal from "../components/CompanyDetailModal";
 import { useAuth } from "../auth/AuthContext";
 import { getCompanyIdFromToken } from "../auth/token";
@@ -65,6 +65,7 @@ export default function AnalysisPage() {
   const [myCompany, setMyCompany] = useState(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [hybridMode, setHybridMode] = useState(false);
 
   const [selected, setSelected] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -93,6 +94,35 @@ export default function AnalysisPage() {
         setMyCompany(null);
       }
 
+      if (isAuthenticated && myCompanyId != null && token) {
+        setHybridMode(true);
+        const { data } = await fetchHybridRecommend({
+          topK: PAGE_SIZE,
+        });
+        const inner = data?.success ? data.data : data;
+        const list = Array.isArray(inner) ? inner : [];
+        const mapped = list.map((r) => {
+          const pct = r.score != null ? Math.round(Number(r.score) * 100) : null;
+          return {
+            id: r.companyId,
+            name: r.companyName,
+            address: r.address || "",
+            region: r.region,
+            type: null,
+            score: pct,
+            hybridScore: r.score,
+            reason: r.reason,
+            matchedParts: r.matchedParts,
+          };
+        });
+        setRows(mapped);
+        setTotalPages(1);
+        setTotalElements(mapped.length);
+        setLoading(false);
+        return;
+      }
+
+      setHybridMode(false);
       const { data } = await apiClient.get("/companies", {
         params: {
           page,
@@ -128,7 +158,7 @@ export default function AnalysisPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, myCompanyId]);
+  }, [page, myCompanyId, isAuthenticated, token]);
 
   useEffect(() => {
     load();
@@ -138,6 +168,23 @@ export default function AnalysisPage() {
     setSelected(null);
     setChatMsg("");
   }, []);
+
+  const sendFeedback = useCallback(
+    async (recommendedId, score, action) => {
+      if (!isAuthenticated || myCompanyId == null) return;
+      try {
+        await postRecommendFeedback({
+          queryCompanyId: myCompanyId,
+          recommendedCompanyId: recommendedId,
+          score: score != null ? Number(score) : null,
+          action,
+        });
+      } catch {
+        /* 무시: 분석 UX 방해 최소화 */
+      }
+    },
+    [isAuthenticated, myCompanyId],
+  );
 
   const requestChat = async (targetCompany) => {
     setChatMsg("");
@@ -154,6 +201,7 @@ export default function AnalysisPage() {
       setChatMsg("자기 소속 업체와는 채팅할 수 없습니다.");
       return;
     }
+    await sendFeedback(targetCompany.id, targetCompany.hybridScore, "chat_started");
     setChatLoading(true);
     try {
       const { data } = await chatApiClient.post("/chat/rooms", {
@@ -175,30 +223,34 @@ export default function AnalysisPage() {
     }
   };
 
-  const openDetail = useCallback(async (company) => {
-    setSelected(company);
-    setDetailLoading(true);
-    setDetailError("");
-    setDetailParts([]);
-    try {
-      const { data } = await apiClient.get(`/companies/${company.id}`);
-      if (data?.success && data.data) {
-        setDetailParts(Array.isArray(data.data.parts) ? data.data.parts : []);
-      } else {
+  const openDetail = useCallback(
+    async (company) => {
+      setSelected(company);
+      await sendFeedback(company.id, company.hybridScore, "viewed");
+      setDetailLoading(true);
+      setDetailError("");
+      setDetailParts([]);
+      try {
+        const { data } = await apiClient.get(`/companies/${company.id}`);
+        if (data?.success && data.data) {
+          setDetailParts(Array.isArray(data.data.parts) ? data.data.parts : []);
+        } else {
+          setDetailError("상세 정보를 불러오지 못했습니다.");
+        }
+      } catch {
         setDetailError("상세 정보를 불러오지 못했습니다.");
+      } finally {
+        setDetailLoading(false);
       }
-    } catch {
-      setDetailError("상세 정보를 불러오지 못했습니다.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+    },
+    [sendFeedback],
+  );
 
   const subtitle = useMemo(() => {
     if (myCompany) {
       return `${myCompany.name} 기준으로 추천 점수 순입니다. 본인 소속 공장은 목록에서 제외됩니다.`;
     }
-    return "로그인하면 소속 공장 기준으로 서버의 추천 점수(가능 시 AI 임베딩 유사도)가 붙습니다. 미로그인 시에는 리뷰·통계 기반 순서입니다.";
+    return "로그인하면 하이브리드 AI 추천(임베딩·온톨로지·카테고리·지역)을 사용합니다. 미로그인 시에는 리뷰·통계 기반 목록입니다.";
   }, [myCompany]);
 
   return (
@@ -208,10 +260,10 @@ export default function AnalysisPage() {
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">협업 분석</h1>
         <p className="mt-2 max-w-3xl text-sm font-normal leading-relaxed text-gray-400">{subtitle}</p>
         <p className="mt-3 max-w-3xl rounded-xl border border-gray-700/80 bg-gray-900/60 px-4 py-3 text-xs font-normal leading-relaxed text-gray-400">
-          <span className="font-semibold text-gray-300">추천 점수 안내:</span> 로그인한 경우 Spring 서버의{" "}
-          <code className="rounded bg-gray-800 px-1 text-[11px] text-orange-200">AiSimilarityService</code>가
-          업체 설명·부품 텍스트를 임베딩해 유사도를 계산합니다(AI 서버 연결·키가 있을 때). 실패 시 규칙 기반
-          협업 점수로 대체됩니다.
+          <span className="font-semibold text-gray-300">추천 점수 안내:</span>{" "}
+          {hybridMode
+            ? "임베딩 유사도·온톨로지 키워드·카테고리·지역 조건을 결합한 하이브리드 점수입니다."
+            : "로그인 후에는 서버의 AI 유사도를 우선하고, 실패 시 규칙 기반 협업 점수로 대체됩니다."}
         </p>
       </div>
 
@@ -248,6 +300,11 @@ export default function AnalysisPage() {
                   <p className="mt-2 text-xs font-medium text-stone-500">
                     {regionKo(row.region)} · {typeKo(row.type)}
                   </p>
+                  {row.reason && (
+                    <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-stone-600">
+                      <span className="font-semibold text-orange-700">이유:</span> {row.reason}
+                    </p>
+                  )}
                   <p className="mt-4 text-xs font-semibold text-orange-600">자세히 보기 · 1:1 채팅은 상세에서</p>
                 </div>
               </button>
@@ -259,7 +316,7 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          {totalPages > 1 && (
+          {!hybridMode && totalPages > 1 && (
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
@@ -288,7 +345,7 @@ export default function AnalysisPage() {
               <Link to="/login" className="font-semibold text-orange-300 underline-offset-2 hover:underline">
                 로그인
               </Link>
-              하면 소속 공장 기준 추천 점수가 더 정확해질 수 있습니다.
+              하면 소속 공장 기준 하이브리드 추천을 사용할 수 있습니다.
             </div>
           )}
         </>
