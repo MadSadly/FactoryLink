@@ -16,3 +16,4 @@ db/csv-path-utf8.txt
 data/ksc.csv
 .idea/
 .vscode/
+hs_err_pid*.log
