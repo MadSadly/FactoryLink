@@ -16,6 +16,22 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+apiClient.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const url = String(err.config?.url ?? "");
+    if (
+      status === 401 &&
+      !url.includes("/auth/login") &&
+      localStorage.getItem(TOKEN_KEY)
+    ) {
+      window.dispatchEvent(new Event("factorylink-auth-expired"));
+    }
+    return Promise.reject(err);
+  }
+);
+
 /** 채팅 REST (server-node). `env.js` 의 CHAT_API_BASE_URL 사용 */
 export const chatApiClient = axios.create({
   baseURL: ENV.CHAT_API_BASE_URL,

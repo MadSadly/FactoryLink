@@ -61,42 +61,45 @@ export default function BuyerDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    let listData = [];
     try {
       const { data } = await apiClient.get("/companies");
       const raw = data?.success ? data.data : data;
-      setList(Array.isArray(raw) ? raw : []);
+      listData = Array.isArray(raw) ? raw : [];
+    } catch {
+      listData = [];
+    }
+    setList(listData);
 
-      if (myCompanyId != null) {
-        try {
-          const { data: recData } = await apiClient.get("/companies", {
-            params: { page: 0, size: 6, sort: "recommend" },
-          });
-          const inner = recData?.success ? recData.data : recData;
-          const content = inner?.content ?? [];
-          setAiRecommended(
-            content.map((c) => ({
-              ...c,
-              score: c.recommendScore != null ? c.recommendScore : null,
-            })),
-          );
-        } catch {
-          setAiRecommended([]);
-        }
+    if (myCompanyId != null) {
+      try {
+        const { data: recData } = await apiClient.get("/companies", {
+          params: { page: 0, size: 6, sort: "recommend" },
+        });
+        const inner = recData?.success ? recData.data : recData;
+        const content = inner?.content ?? [];
+        setAiRecommended(
+          content.map((c) => ({
+            ...c,
+            score: c.recommendScore != null ? c.recommendScore : null,
+          })),
+        );
+      } catch {
+        setAiRecommended([]);
+      }
+      try {
         const { data: detail } = await apiClient.get(`/companies/${myCompanyId}`);
         const d = detail?.success ? detail.data : detail;
         const c = d?.company;
         setMyCompany(c && c.id ? c : null);
-      } else {
+      } catch {
         setMyCompany(null);
-        setAiRecommended([]);
       }
-    } catch {
-      setList([]);
+    } else {
       setMyCompany(null);
       setAiRecommended([]);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [myCompanyId]);
 
   useEffect(() => {
@@ -126,9 +129,9 @@ export default function BuyerDashboard() {
   return (
     <div className="space-y-10">
       <div>
-        <p className="text-sm font-semibold text-orange-600">오늘의 요약</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900">대시보드</h1>
-        <p className="mt-2 max-w-xl text-sm font-normal leading-relaxed text-stone-500">
+        <p className="text-sm font-semibold text-orange-400">오늘의 요약</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">대시보드</h1>
+        <p className="mt-2 max-w-xl text-sm font-normal leading-relaxed text-gray-400">
           협업 추천과 지표를 한눈에 확인합니다.
         </p>
       </div>
@@ -174,8 +177,8 @@ export default function BuyerDashboard() {
       <section>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-stone-900">공장 추천</h2>
-            <p className="mt-1 text-sm font-normal text-stone-500">
+            <h2 className="text-lg font-bold text-white">공장 추천</h2>
+            <p className="mt-1 text-sm font-normal text-gray-400">
               {myCompany
                 ? `${myCompany.name} 기준 협업 적합도 상위 업체입니다.`
                 : "로그인 후 소속 공장 기준 맞춤 추천을 확인할 수 있습니다."}
@@ -189,7 +192,7 @@ export default function BuyerDashboard() {
           </Link>
         </div>
 
-        {loading && <p className="text-sm font-normal text-stone-500">불러오는 중…</p>}
+        {loading && <p className="text-sm font-normal text-gray-400">불러오는 중…</p>}
 
         {!loading && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

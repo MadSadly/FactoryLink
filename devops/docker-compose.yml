@@ -40,7 +40,8 @@ services:
       DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
-      AI_SERVER_URL: http://server-ai:8000
+      AI_SERVER_URL: ${AI_SERVER_URL:-http://server-ai:8000}
+      AI_EMBEDDING_ENABLED: ${AI_EMBEDDING_ENABLED:-false}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -70,6 +71,8 @@ services:
       - "8000:8000"
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # false(기본): TF-IDF 유사도만 — 컨테이너 안에서도 로컬 연산, 추가 비용 없음
+      USE_GEMINI_EMBEDDING: ${USE_GEMINI_EMBEDDING:-false}
       DB_HOST: mariadb
       DB_PORT: 3306
       DB_NAME: factory_link

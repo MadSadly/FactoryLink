@@ -22,4 +22,10 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   ai:
     server:
-      url: ${AI_SERVER_URL:http://localhost:8000}
+      url: ${AI_SERVER_URL:http://127.0.0.1:8000}
+    embedding:
+      # true: server-ai /api/similarity/companies (Gemini 임베딩). false: 규칙 기반만 (비용 없음)
+      enabled: ${AI_EMBEDDING_ENABLED:false}
+  kakao:
+    # 로컬 주소 검색 프록시(/api/kakao/local/search/address) — REST API 키
+    rest-api-key: ${KAKAO_REST_API_KEY:}

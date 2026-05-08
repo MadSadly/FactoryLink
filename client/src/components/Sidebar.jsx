@@ -7,7 +7,6 @@ const items = [
   { to: "/companies", label: "업체 지도", icon: "map" },
   { to: "/analysis", label: "협업 분석", icon: "hub" },
   { to: "/quote", label: "견적·계약서", icon: "", lucide: FileText },
-  { to: "/contract", label: "AI 계약", icon: "edit_document" },
   { to: "/chat", label: "채팅", icon: "chat" },
   { to: "/profile", label: "회사 설정", icon: "settings" },
 ];

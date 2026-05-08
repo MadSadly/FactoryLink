@@ -1,6 +1,12 @@
-/* 카카오맵: 앱 설정에서 JavaScript 키·허용 도메인을 등록하세요. */
+/* 카카오맵: 앱 설정에서 JavaScript 키·허용 도메인을 등록하세요.
+ * 주소→좌표는 SDK Geocoder 대신 Spring 프록시(/api/kakao/local/search/address)를 사용합니다.
+ * (브라우저에서 dapi 직접 호출 시 CORS 차단) */
 
 import { useEffect, useRef } from "react";
+import { apiClient } from "../api/client";
+
+const GEO_DELAY_MS = 160;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const REGION_CENTER = {
   SEOUL: { lat: 37.5665, lng: 126.978 },
@@ -90,8 +96,6 @@ export default function KakaoMap({
       console.warn("Kakao map controls:", e);
     }
 
-    const geocoder = new kakao.maps.services.Geocoder();
-
     const clearLayers = () => {
       markersRef.current.forEach((m) => m.setMap(null));
       overlaysRef.current.forEach((o) => o.setMap(null));
@@ -144,52 +148,60 @@ export default function KakaoMap({
       overlaysRef.current.push(overlay);
     };
 
-    const resolveLatLng = (company, done) => {
+    const resolveLatLngAsync = async (company) => {
       const regionKey = company.region && REGION_CENTER[company.region] ? company.region : "OTHER";
       const fallback = REGION_CENTER[regionKey] || REGION_CENTER.OTHER;
       const addr = (company.address || "").trim();
       if (!addr) {
-        done(
-          new kakao.maps.LatLng(fallback.lat, fallback.lng)
-        );
-        return;
+        return new kakao.maps.LatLng(fallback.lat, fallback.lng);
       }
-      geocoder.addressSearch(addr, (result, status) => {
-        if (status === kakao.maps.services.Status.OK && result?.[0]) {
-          done(
-            new kakao.maps.LatLng(Number(result[0].y), Number(result[0].x))
-          );
-        } else {
-          done(
-            new kakao.maps.LatLng(fallback.lat, fallback.lng)
-          );
+      try {
+        const { data } = await apiClient.get("/kakao/local/search/address", {
+          params: { query: addr, page: 1, size: 10 },
+        });
+        const inner = data?.success ? data.data : data;
+        const docs = inner?.documents;
+        if (Array.isArray(docs) && docs[0]) {
+          return new kakao.maps.LatLng(Number(docs[0].y), Number(docs[0].x));
         }
-      });
+      } catch (e) {
+        console.warn("주소 좌표 변환 실패:", e?.response?.status ?? e);
+      }
+      return new kakao.maps.LatLng(fallback.lat, fallback.lng);
     };
 
     clearLayers();
-    let remaining = companies.length;
-    if (remaining === 0) {
+    if (companies.length === 0) {
       return () => {
         clearLayers();
         mapRef.current = null;
       };
     }
 
-    companies.forEach((company) => {
-      resolveLatLng(company, (latlng) => {
+    (async () => {
+      for (let i = 0; i < companies.length; i++) {
+        if (cancelled) {
+          return;
+        }
+        const company = companies[i];
+        const latlng = await resolveLatLngAsync(company);
         if (cancelled) {
           return;
         }
         placeMarker(company, latlng);
-        remaining -= 1;
-        if (remaining === 0 && markersRef.current.length > 0) {
-          const bounds = new kakao.maps.LatLngBounds();
-          markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-          map.setBounds(bounds);
+        if (i < companies.length - 1) {
+          await sleep(GEO_DELAY_MS);
         }
-      });
-    });
+      }
+      if (cancelled) {
+        return;
+      }
+      if (markersRef.current.length > 0) {
+        const bounds = new kakao.maps.LatLngBounds();
+        markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
+        map.setBounds(bounds);
+      }
+    })();
 
     return () => {
       cancelled = true;

@@ -62,9 +62,22 @@ popd
 echo.
 echo --- server-ai ---
 pushd "%ROOT%server-ai"
-python -m pip install -r requirements.txt
+if not exist ".venv\Scripts\python.exe" (
+  echo [info] Creating server-ai virtual environment ...
+  python -m venv .venv
+  if errorlevel 1 (
+    echo [ERROR] server-ai venv create failed - check python on PATH
+    popd
+    pause
+    exit /b 1
+  )
+)
+
+echo [info] Using server-ai venv python ...
+call ".venv\Scripts\python.exe" -m pip install --upgrade pip
+call ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 (
-  echo [ERROR] server-ai pip install failed - check python on PATH
+  echo [ERROR] server-ai pip install failed in .venv
   popd
   pause
   exit /b 1
@@ -82,7 +95,7 @@ timeout /t 12 /nobreak >nul
 start "Factory-Link Chat" cmd /k cd /d "%ROOT%server-node" ^&^& npm run dev
 
 REM Use 127.0.0.1 (not 0.0.0.0) to avoid WinError 10013 on some Windows setups
-start "Factory-Link AI" cmd /k cd /d "%ROOT%server-ai" ^&^& python -m uvicorn app.main:app --reload --host 127.0.0.1 --port %AI_PORT%
+start "Factory-Link AI" cmd /k cd /d "%ROOT%server-ai" ^&^& call ".venv\Scripts\python.exe" -m uvicorn app.main:app --reload --host 127.0.0.1 --port %AI_PORT%
 
 timeout /t 2 /nobreak >nul
 

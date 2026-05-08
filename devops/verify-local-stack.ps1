@@ -3,24 +3,57 @@
 param(
   [int]$SpringWaitSec = 180,
   [int]$PollSec = 3,
-  [int]$AiPort = 8000
+  [int]$AiPort = 8000,
+  [int]$AiWaitSec = 90,
+  [int]$ChatWaitSec = 45,
+  [int]$ClientWaitSec = 45
 )
 
 function Test-HttpOk {
-  param([string]$Uri, [string]$Label, [int]$TimeoutSec = 8)
+  param([string]$Uri, [string]$Label, [int]$TimeoutSec = 8, [switch]$Quiet)
   try {
     $r = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec $TimeoutSec
     if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) {
       Write-Host ('[OK] ' + $Label + ' HTTP ' + [string]$r.StatusCode) -ForegroundColor Green
       return $true
     }
-    Write-Host ('[FAIL] ' + $Label + ' HTTP ' + [string]$r.StatusCode) -ForegroundColor Red
+    if (-not $Quiet) {
+      Write-Host ('[FAIL] ' + $Label + ' HTTP ' + [string]$r.StatusCode) -ForegroundColor Red
+    }
     return $false
   }
   catch {
-    Write-Host ('[FAIL] ' + $Label + ' -> ' + $_.Exception.Message) -ForegroundColor Red
+    if (-not $Quiet) {
+      Write-Host ('[FAIL] ' + $Label + ' -> ' + $_.Exception.Message) -ForegroundColor Red
+    }
     return $false
   }
+}
+
+function Wait-HttpOk {
+  param(
+    [string]$Uri,
+    [string]$Label,
+    [int]$WaitSec = 30,
+    [int]$Poll = 3,
+    [int]$TimeoutSec = 5
+  )
+  Write-Host ('Waiting for ' + $Label + ' (max ' + [string]$WaitSec + 's)...') -ForegroundColor DarkGray
+  $deadline = (Get-Date).AddSeconds($WaitSec)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $r = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec $TimeoutSec
+      if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) {
+        Write-Host ('[OK] ' + $Label + ' HTTP ' + [string]$r.StatusCode) -ForegroundColor Green
+        return $true
+      }
+    }
+    catch {
+    }
+    Start-Sleep -Seconds $Poll
+  }
+  Write-Host ('[FAIL] ' + $Label + ' -> timeout ' + [string]$WaitSec + 's') -ForegroundColor Red
+  return $false
 }
 
 Write-Host ""
@@ -86,9 +119,11 @@ if (-not $springReady) {
 Write-Host ""
 $allOk = $true
 
-$allOk = (Test-HttpOk -Uri "http://localhost:3001/health" -Label "Node chat /health") -and $allOk
-$allOk = (Test-HttpOk -Uri ("http://localhost:{0}/health" -f $AiPort) -Label "AI /health") -and $allOk
-$allOk = (Test-HttpOk -Uri "http://localhost:5173/" -Label "Vite client :5173") -and $allOk
+# Node / AI / Vite 는 dev-start 직후 아직 리슨 전일 수 있음 → 대기 루프만 사용 (첫 실패는 조용히 재시도)
+$allOk = (Wait-HttpOk -Uri "http://localhost:3001/health" -Label "Node chat /health" -WaitSec $ChatWaitSec -Poll $PollSec) -and $allOk
+# Uvicorn 은 127.0.0.1 에 바인딩 (localhost IPv6 회피)
+$allOk = (Wait-HttpOk -Uri ("http://127.0.0.1:{0}/health" -f $AiPort) -Label "AI /health" -WaitSec $AiWaitSec -Poll $PollSec) -and $allOk
+$allOk = (Wait-HttpOk -Uri "http://localhost:5173/" -Label "Vite client :5173" -WaitSec $ClientWaitSec -Poll $PollSec) -and $allOk
 $allOk = (Test-HttpOk -Uri "http://localhost:8080/api/companies" -Label "Spring GET /api/companies") -and $allOk
 
 Write-Host ""

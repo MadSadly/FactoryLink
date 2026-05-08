@@ -28,8 +28,8 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(HttpMethod.GET, "/api/companies/recommend")
-                    .authenticated()
+                auth.requestMatchers(HttpMethod.POST, "/api/ai/parse-requirements")
+                    .permitAll()
                     .requestMatchers(
                         HttpMethod.POST,
                         "/api/auth/login",
@@ -39,6 +39,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/health")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/parts", "/api/parts/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/kakao/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/companies", "/api/companies/**")
                     .permitAll()

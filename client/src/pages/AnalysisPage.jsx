@@ -96,33 +96,42 @@ export default function AnalysisPage() {
 
       if (isAuthenticated && myCompanyId != null && token) {
         setHybridMode(true);
-        const { data } = await fetchHybridRecommend({
-          topK: PAGE_SIZE,
-        });
-        const inner = data?.success ? data.data : data;
-        const list = Array.isArray(inner) ? inner : [];
-        const mapped = list.map((r) => {
-          const pct = r.score != null ? Math.round(Number(r.score) * 100) : null;
-          return {
-            id: r.companyId,
-            name: r.companyName,
-            address: r.address || "",
-            region: r.region,
-            type: null,
-            score: pct,
-            hybridScore: r.score,
-            reason: r.reason,
-            matchedParts: r.matchedParts,
-          };
-        });
-        setRows(mapped);
-        setTotalPages(1);
-        setTotalElements(mapped.length);
-        setLoading(false);
-        return;
+        try {
+          const { data } = await fetchHybridRecommend({
+            topK: PAGE_SIZE,
+          });
+          const inner = data?.success ? data.data : data;
+          const list = Array.isArray(inner) ? inner : [];
+          const mapped = list.map((r) => {
+            const pct = r.score != null ? Math.round(Number(r.score) * 100) : null;
+            return {
+              id: r.companyId,
+              name: r.companyName,
+              address: r.address || "",
+              region: r.region,
+              type: null,
+              score: pct,
+              hybridScore: r.score,
+              reason: r.reason,
+              matchedParts: r.matchedParts,
+            };
+          });
+          setRows(mapped);
+          setTotalPages(1);
+          setTotalElements(mapped.length);
+          setLoading(false);
+          return;
+        } catch (recErr) {
+          if (recErr?.response?.status === 401) {
+            setHybridMode(false);
+          } else {
+            throw recErr;
+          }
+        }
+      } else {
+        setHybridMode(false);
       }
 
-      setHybridMode(false);
       const { data } = await apiClient.get("/companies", {
         params: {
           page,

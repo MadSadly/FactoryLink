@@ -47,7 +47,8 @@ public class AiSimilarityService {
   @Value("${app.ai.server.url:http://localhost:8000}")
   private String aiServerUrl;
 
-  @Value("${app.ai.embedding.enabled:true}")
+  /** false면 Gemini 임베딩 호출 없이 규칙 기반 협업 점수만 사용 (로컬/무료 개발용). */
+  @Value("${app.ai.embedding.enabled:false}")
   private boolean embeddingEnabled;
 
   public AiSimilarityService(RestTemplate restTemplate, PartMapper partMapper) {

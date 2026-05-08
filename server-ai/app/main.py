@@ -31,7 +31,12 @@ load_dotenv()
 logger = logging.getLogger("factorylink.ai")
 
 # Gemini 임베딩 모델 (짧은 이름 또는 models/… 전체 이름)
-EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+
+
+def _use_gemini_embedding() -> bool:
+    """true일 때만 Gemini batchEmbed (유료/할당량). 기본 false → TF-IDF(로컬 무료)."""
+    return os.getenv("USE_GEMINI_EMBEDDING", "false").lower() in ("1", "true", "yes")
 
 
 @asynccontextmanager
@@ -256,13 +261,24 @@ class SimilarityCompaniesRequest(BaseModel):
 def similarity_companies(payload: SimilarityCompaniesRequest):
     try:
         texts = [payload.anchor_text] + [c.text for c in payload.candidates]
-        mat = embed_texts_batch(texts, EMBEDDING_MODEL, task_type="semantic_similarity")
-        anchor = mat[0:1]
+        if not payload.candidates:
+            return {"success": True, "data": [], "message": "OK"}
         out = []
-        for i, c in enumerate(payload.candidates):
-            sim = float(cosine_similarity(anchor, mat[i + 1 : i + 2])[0][0])
-            score = int(round(max(0, min(100, sim * 100))))
-            out.append({"id": c.id, "score": score})
+        if _use_gemini_embedding():
+            mat = embed_texts_batch(texts, EMBEDDING_MODEL, task_type="semantic_similarity")
+            anchor = mat[0:1]
+            for i, c in enumerate(payload.candidates):
+                sim = float(cosine_similarity(anchor, mat[i + 1 : i + 2])[0][0])
+                score = int(round(max(0, min(100, sim * 100))))
+                out.append({"id": c.id, "score": score})
+        else:
+            v = TfidfVectorizer(min_df=1)
+            X = v.fit_transform(texts)
+            anchor = X[0:1]
+            for i, c in enumerate(payload.candidates):
+                sim = float(cosine_similarity(anchor, X[i + 1 : i + 2])[0][0])
+                score = int(round(max(0, min(100, sim * 100))))
+                out.append({"id": c.id, "score": score})
         return {"success": True, "data": out, "message": "OK"}
     except Exception as e:
         logger.exception("similarity_companies: %s", e)
@@ -313,6 +329,7 @@ def ai_recommend(body: RecommendRequest):
             body.top_k,
             [dict(r) for r in parts_rows],
             companies,
+            use_embedding=_use_gemini_embedding(),
         )
     except Exception as e:
         logger.exception("ai_recommend")

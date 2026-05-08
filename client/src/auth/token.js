@@ -10,6 +10,16 @@ export function decodeJwtPayload(token) {
   }
 }
 
+/** exp 클레임 기준. 없으면 만료로 보지 않음(서버 검증에 맡김). */
+export function isJwtExpired(token) {
+  if (!token) return true;
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  const expSec = Number(payload.exp);
+  if (!Number.isFinite(expSec)) return false;
+  return Date.now() / 1000 >= expSec;
+}
+
 export function getRoleFromToken(token) {
   const payload = decodeJwtPayload(token);
   if (!payload) return "GUEST";

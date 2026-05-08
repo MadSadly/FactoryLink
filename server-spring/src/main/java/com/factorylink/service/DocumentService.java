@@ -42,6 +42,7 @@ public class DocumentService {
   }
 
   public Map<String, Object> parseRequirements(String rawInput) {
+    SecurityUtils.requirePrincipal();
     String url = base() + "/ai/parse-requirements";
     Map<String, String> body = Map.of("raw_input", rawInput);
     try {

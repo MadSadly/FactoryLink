@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.gemini_client import embed_texts_batch
@@ -116,6 +117,8 @@ def hybrid_recommend(
     top_k: int,
     parts_rows: List[Dict[str, Any]],
     companies: Dict[int, Dict[str, Any]],
+    *,
+    use_embedding: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     parts_rows: id, company_id, name, category, description, region
@@ -153,14 +156,20 @@ def hybrid_recommend(
             (cid, name, str(r.get("category") or ""), str(r.get("region") or ""))
         )
 
-    q_emb = embed_texts_batch(
-        [query_text], embedding_model or None, task_type="retrieval_query"
-    )
     if part_texts:
-        p_emb = embed_texts_batch(
-            part_texts, embedding_model or None, task_type="retrieval_document"
-        )
-        sims = cosine_similarity(q_emb, p_emb)[0]
+        if use_embedding:
+            q_emb = embed_texts_batch(
+                [query_text], embedding_model or None, task_type="retrieval_query"
+            )
+            p_emb = embed_texts_batch(
+                part_texts, embedding_model or None, task_type="retrieval_document"
+            )
+            sims = cosine_similarity(q_emb, p_emb)[0]
+        else:
+            corpus = [query_text] + part_texts
+            vec = TfidfVectorizer(min_df=1)
+            X = vec.fit_transform(corpus)
+            sims = cosine_similarity(X[0:1], X[1:])[0]
     else:
         sims = np.array([])
 
@@ -213,7 +222,9 @@ def hybrid_recommend(
         if reg_hit > 0:
             reason_parts.append("지역 조건 일치")
         if not reason_parts:
-            reason_parts.append("임베딩 유사도 기반")
+            reason_parts.append(
+                "임베딩 유사도 기반" if use_embedding else "TF-IDF 키워드 유사도 기반"
+            )
 
         results.append(
             {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Send, Circle, Loader2, MessageCircle, FileText, Receipt } from "lucide-react";
+import { Search, Send, Circle, Loader2, MessageCircle, FileText } from "lucide-react";
 import { chatSocket } from "../api/socket";
 import { chatApiClient } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -234,19 +234,12 @@ export default function ChatPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            to="/contract"
+            to="/quote"
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm transition hover:bg-stone-50"
+            title="견적·계약서 워크플로(자연어 입력·PDF·채팅 전송)"
           >
             <FileText className="h-4 w-4 text-orange-600" />
-            계약서
-          </Link>
-          <Link
-            to="/contract"
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm transition hover:bg-stone-50"
-            title="견적·조건은 AI 계약서 화면에서 입력·초안 작성"
-          >
-            <Receipt className="h-4 w-4 text-orange-600" />
-            견적서
+            견적·계약서
           </Link>
         </div>
       </div>
